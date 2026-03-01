@@ -78,6 +78,19 @@ async def list_languages(_current_user: User = Depends(get_current_user)):
     return LANGUAGES
 
 
+@router.get("/by-title/{title}", response_model=TreebankRead)
+async def get_treebank_by_title(
+    title: str,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Treebank).where(Treebank.title == title))
+    treebank = result.scalar_one_or_none()
+    if not treebank:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
+    return treebank
+
+
 @router.get("/{treebank_id}", response_model=TreebankRead)
 async def get_treebank(
     treebank_id: int,
@@ -129,7 +142,9 @@ async def upload_conllu(
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
 
-    content = (await file.read()).decode("utf-8")
+    content = (await file.read()).decode("utf-8").replace("\r\n", "\n")
+    if not content.endswith("\n"):
+        content += "\n"
     if not validate_uploaded_text(content):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid CoNLL-U file")
 

@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { getAnnotationByPosition, updateAnnotation, updateWordlines } from '$api/annotations';
 	import { listSentences } from '$api/sentences';
-	import { getTreebank } from '$api/treebanks';
+	import { getTreebankByTitle } from '$api/treebanks';
 	import { ApiError } from '$api/client';
 	import {
 		loadAnnotation,
@@ -29,7 +29,7 @@
 	import DisplacyGraph from '$components/graph/DisplacyGraph.svelte';
 	import type { TreebankRead } from '$api/types';
 
-	const treebankId = $derived(Number(page.params.treebank));
+	const treebankSlug = $derived(decodeURIComponent(page.params.treebank));
 	const order = $derived(Number(page.params.order));
 
 	let treebank = $state<TreebankRead | null>(null);
@@ -71,13 +71,13 @@
 		loading = true;
 		error = '';
 		try {
-			const [detail, tb, sents] = await Promise.all([
-				getAnnotationByPosition(treebankId, order),
-				getTreebank(treebankId),
-				listSentences(treebankId)
+			const tb = await getTreebankByTitle(treebankSlug);
+			treebank = tb;
+			const [detail, sents] = await Promise.all([
+				getAnnotationByPosition(tb.id, order),
+				listSentences(tb.id)
 			]);
 			loadAnnotation(detail);
-			treebank = tb;
 			maxOrder = sents.length > 0 ? Math.max(...sents.map((s) => s.order)) : 0;
 		} catch (err) {
 			error = err instanceof ApiError ? err.detail : 'Failed to load annotation';
@@ -87,7 +87,7 @@
 	}
 
 	async function save() {
-		if (!$annotationId) return;
+		if (!$annotationId || !treebank) return;
 		isSaving.set(true);
 		try {
 			await updateWordlines($annotationId, getCellsForSave());
@@ -95,7 +95,7 @@
 				status: $annotationStatus,
 				notes: $notes,
 			});
-			const detail = await getAnnotationByPosition(treebankId, order);
+			const detail = await getAnnotationByPosition(treebank.id, order);
 			loadAnnotation(detail);
 		} catch (err) {
 			error = err instanceof ApiError ? err.detail : 'Failed to save';
@@ -107,14 +107,14 @@
 	async function goPrev() {
 		if (order <= 1) return;
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
-		await goto(`/annotate/${treebankId}/${order - 1}`);
+		await goto(`/annotate/${treebankSlug}/${order - 1}`);
 		await loadPage();
 	}
 
 	async function goNext() {
 		if (order >= maxOrder) return;
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
-		await goto(`/annotate/${treebankId}/${order + 1}`);
+		await goto(`/annotate/${treebankSlug}/${order + 1}`);
 		await loadPage();
 	}
 
@@ -145,7 +145,7 @@
 	<!-- Header bar -->
 	<div class="flex items-center justify-between border-b border-border bg-background px-4 py-2">
 		<div class="flex items-center gap-4">
-			<a href="/treebanks/{treebankId}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
+			<a href="/treebanks/{treebankSlug}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
 			<span class="text-sm font-mono text-muted-foreground">#{$sentId}</span>
 		</div>
 		<div class="flex items-center gap-3 text-sm">

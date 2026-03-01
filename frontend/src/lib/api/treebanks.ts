@@ -9,6 +9,10 @@ export function getTreebank(id: number) {
 	return api.get<TreebankRead>(`/treebanks/${id}`);
 }
 
+export function getTreebankByTitle(title: string) {
+	return api.get<TreebankRead>(`/treebanks/by-title/${encodeURIComponent(title)}`);
+}
+
 export function createTreebank(title: string, language: string) {
 	return api.post<TreebankRead>('/treebanks', { title, language });
 }

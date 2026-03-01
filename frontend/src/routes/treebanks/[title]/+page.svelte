@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { getTreebank, uploadConllu, exportConllu } from '$api/treebanks';
+	import { getTreebankByTitle, uploadConllu, exportConllu } from '$api/treebanks';
 	import { listSentences, createSentence, deleteSentence } from '$api/sentences';
 	import { ApiError } from '$api/client';
 	import type { TreebankRead, SentenceBrief } from '$api/types';
@@ -9,7 +9,7 @@
 	import Input from '$components/common/Input.svelte';
 	import Modal from '$components/common/Modal.svelte';
 
-	const treebankId = $derived(Number(page.params.id));
+	const treebankTitle = $derived(decodeURIComponent(page.params.title));
 
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);
@@ -42,12 +42,9 @@
 
 	async function loadData() {
 		loading = true;
-		const [tb, sents] = await Promise.all([
-			getTreebank(treebankId),
-			listSentences(treebankId)
-		]);
+		const tb = await getTreebankByTitle(treebankTitle);
 		treebank = tb;
-		allSentences = sents;
+		allSentences = await listSentences(tb.id);
 		loading = false;
 	}
 
@@ -58,8 +55,9 @@
 	async function handleAddSentence(e: SubmitEvent) {
 		e.preventDefault();
 		addError = '';
+		if (!treebank) return;
 		try {
-			await createSentence(treebankId, newSentId, newText);
+			await createSentence(treebank.id, newSentId, newText);
 			showAdd = false;
 			newSentId = '';
 			newText = '';
@@ -73,9 +71,9 @@
 		e.preventDefault();
 		uploadError = '';
 		uploadMsg = '';
-		if (!uploadFile) return;
+		if (!uploadFile || !treebank) return;
 		try {
-			const result = await uploadConllu(treebankId, uploadFile);
+			const result = await uploadConllu(treebank.id, uploadFile);
 			uploadMsg = `Imported ${result.sentences_created} sentences.`;
 			uploadFile = null;
 			await loadData();
@@ -93,7 +91,7 @@
 	}
 
 	function annotate(sentence: SentenceBrief) {
-		window.location.href = `/annotate/${treebankId}/${sentence.order}`;
+		window.location.href = `/annotate/${treebankTitle}/${sentence.order}`;
 	}
 
 	function onFileChange(e: Event) {
@@ -117,7 +115,7 @@
 				</div>
 				<div class="flex gap-2">
 					<a
-						href="/treebanks/{treebankId}/agreement"
+						href="/treebanks/{treebankTitle}/agreement"
 						class="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
 					>Agreement</a>
 					<Button variant="outline" onclick={() => (showUpload = true)}>Upload CoNLL-U</Button>

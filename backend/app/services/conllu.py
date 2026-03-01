@@ -11,9 +11,9 @@ _data_dir = Path(__file__).resolve().parent.parent / "data"
 with (_data_dir / "language_ids.json").open(encoding="utf-8") as _f:
     LANGUAGES: dict[str, str] = json.load(_f)
 
-# Regex: a sentence is one or more comment lines (# key = value) followed by
+# Regex: a sentence is one or more comment lines (starting with #) followed by
 # one or more word lines (10 tab-separated fields).
-_SENTENCE_RE = re.compile(r"(?:#.+=.*\n)+(?:(?:.+\t){9}.+\n)+")
+_SENTENCE_RE = re.compile(r"(?:#[^\n]*\n)+(?:(?:[^\t\n]+\t){9}[^\t\n]+\n)+")
 _COMMENT_RE = re.compile(r"#(.+)=(.*)")
 _WORD_RE = re.compile(r"(?:.+\t){9}.+")
 

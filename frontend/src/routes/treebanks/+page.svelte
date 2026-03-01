@@ -88,7 +88,7 @@
 						{@const pct = tb.sentence_count > 0 ? Math.round((tb.complete_count / tb.sentence_count) * 100) : 0}
 						<tr class="border-t border-border hover:bg-muted/50">
 							<td class="px-4 py-3">
-								<a href="/treebanks/{tb.id}" class="font-medium text-primary hover:underline">{tb.title}</a>
+								<a href="/treebanks/{tb.title}" class="font-medium text-primary hover:underline">{tb.title}</a>
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">{tb.language}</td>
 							<td class="px-4 py-3">{tb.sentence_count}</td>

@@ -71,7 +71,7 @@
 					<div class="flex items-center gap-3">
 						<span class="text-xs text-muted-foreground">{ann.treebank_title}</span>
 						<a
-							href="/annotate/{ann.treebank_id}/{ann.sentence_order}"
+							href="/annotate/{ann.treebank_title}/{ann.sentence_order}"
 							class="text-sm text-primary hover:underline"
 						>
 							Edit

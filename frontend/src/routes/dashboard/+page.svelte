@@ -65,7 +65,7 @@
 								{@const pct = tb.sentence_count > 0 ? Math.round((tb.complete_count / tb.sentence_count) * 100) : 0}
 								<tr class="border-t border-border hover:bg-muted/50">
 									<td class="px-4 py-2">
-										<a href="/treebanks/{tb.id}" class="text-primary hover:underline">{tb.title}</a>
+										<a href="/treebanks/{tb.title}" class="text-primary hover:underline">{tb.title}</a>
 									</td>
 									<td class="px-4 py-2 text-muted-foreground">{tb.language}</td>
 									<td class="px-4 py-2">{tb.sentence_count}</td>
@@ -98,7 +98,7 @@
 									{statusLabels[ann.status]}
 								</span>
 							</div>
-							<a href="/annotate/{ann.treebank_id}/{ann.sentence_order}" class="text-sm text-primary hover:underline">Edit</a>
+							<a href="/annotate/{ann.treebank_title}/{ann.sentence_order}" class="text-sm text-primary hover:underline">Edit</a>
 						</div>
 					{/each}
 				</div>

@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { getTreebank, getAgreement } from '$api/treebanks';
+	import { getTreebankByTitle, getAgreement } from '$api/treebanks';
 	import { listSentences, getSentenceDiff } from '$api/sentences';
 	import type { TreebankRead, SentenceBrief, AgreementResponse, DiffResponse } from '$api/types';
 	import DiffView from '$components/graph/DiffView.svelte';
 
-	const treebankId = $derived(Number(page.params.id));
+	const treebankTitle = $derived(decodeURIComponent(page.params.title));
 
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);
@@ -21,12 +21,12 @@
 
 	onMount(async () => {
 		try {
-			const [tb, sents, agr] = await Promise.all([
-				getTreebank(treebankId),
-				listSentences(treebankId),
-				getAgreement(treebankId)
-			]);
+			const tb = await getTreebankByTitle(treebankTitle);
 			treebank = tb;
+			const [sents, agr] = await Promise.all([
+				listSentences(tb.id),
+				getAgreement(tb.id)
+			]);
 			sentences = sents;
 			agreement = agr;
 		} catch (err) {
@@ -51,7 +51,7 @@
 
 <div class="mx-auto max-w-7xl px-4 py-8">
 	<div class="mb-1">
-		<a href="/treebanks/{treebankId}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
+		<a href="/treebanks/{treebankTitle}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
 	</div>
 	<h1 class="mb-6 text-2xl font-bold">Inter-Annotator Agreement</h1>
 
