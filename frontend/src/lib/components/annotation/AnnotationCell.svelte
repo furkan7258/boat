@@ -28,11 +28,22 @@
 		if (e.key === 'Tab') {
 			e.preventDefault();
 			cellEl?.blur();
-			// Move to next cell
+			const td = cellEl?.parentElement;
 			const next = e.shiftKey
-				? cellEl?.parentElement?.previousElementSibling?.querySelector<HTMLElement>('[contenteditable]')
-				: cellEl?.parentElement?.nextElementSibling?.querySelector<HTMLElement>('[contenteditable]');
-			next?.focus();
+				? td?.previousElementSibling?.querySelector<HTMLElement>('[contenteditable], input')
+				: td?.nextElementSibling?.querySelector<HTMLElement>('[contenteditable], input');
+			if (next) {
+				next.focus();
+			} else {
+				// Wrap to next/previous row
+				const row = td?.closest('tr');
+				const targetRow = e.shiftKey ? row?.previousElementSibling : row?.nextElementSibling;
+				if (targetRow) {
+					const cells = targetRow.querySelectorAll<HTMLElement>('[contenteditable], input');
+					const wrap = e.shiftKey ? cells[cells.length - 1] : cells[0];
+					wrap?.focus();
+				}
+			}
 		}
 		if (e.key === 'Escape') {
 			if (cellEl) cellEl.textContent = value;

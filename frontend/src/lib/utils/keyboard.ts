@@ -16,6 +16,18 @@ export function createShortcutManager() {
 		const isEditable = (e.target as HTMLElement)?.isContentEditable;
 		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
+		// In contenteditable cells, only allow Ctrl+Z/Y (undo/redo)
+		if (isEditable) {
+			if (e.ctrlKey && (e.key === 'z' || e.key === 'y')) {
+				e.preventDefault();
+				const undo = shortcuts.find((s) => s.ctrl && s.key === 'z');
+				const redo = shortcuts.find((s) => s.ctrl && s.key === 'y');
+				if (e.key === 'z' && undo) undo.handler();
+				if (e.key === 'y' && redo) redo.handler();
+			}
+			return;
+		}
+
 		for (const s of shortcuts) {
 			if (
 				e.key.toLowerCase() === s.key.toLowerCase() &&
@@ -27,15 +39,6 @@ export function createShortcutManager() {
 				s.handler();
 				return;
 			}
-		}
-
-		// Allow Ctrl+Z/Y in contenteditable cells
-		if (isEditable && e.ctrlKey && (e.key === 'z' || e.key === 'y')) {
-			e.preventDefault();
-			const undo = shortcuts.find((s) => s.ctrl && s.key === 'z');
-			const redo = shortcuts.find((s) => s.ctrl && s.key === 'y');
-			if (e.key === 'z' && undo) undo.handler();
-			if (e.key === 'y' && redo) redo.handler();
 		}
 	}
 

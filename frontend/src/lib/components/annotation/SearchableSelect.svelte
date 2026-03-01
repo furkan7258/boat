@@ -20,7 +20,7 @@
 
 	const filtered = $derived(
 		filter
-			? options.filter((o) => o.toLowerCase().startsWith(filter.toLowerCase()))
+			? options.filter((o) => o.toLowerCase().includes(filter.toLowerCase()))
 			: [...options]
 	);
 

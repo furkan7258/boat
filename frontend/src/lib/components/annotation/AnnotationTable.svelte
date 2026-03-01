@@ -46,6 +46,9 @@
 		return editableFields.includes(col as CellField);
 	}
 
+	// Set of valid token IDs for HEAD validation
+	const validIds = $derived(new Set($cells.map((c) => c.id_f)));
+
 	// Inline validation
 	function cellError(cell: typeof $cells[0], col: string): string | null {
 		if (col === 'upos' && cell.upos !== '_' && !UPOS_TAGS.includes(cell.upos as any)) {
@@ -56,6 +59,7 @@
 				const n = parseInt(cell.head);
 				if (isNaN(n) || n < 0) return `Invalid HEAD: ${cell.head}`;
 				if (cell.head === cell.id_f) return 'Self-loop: HEAD equals own ID';
+				if (!validIds.has(cell.head)) return `HEAD ${cell.head} does not exist`;
 			}
 		}
 		return null;

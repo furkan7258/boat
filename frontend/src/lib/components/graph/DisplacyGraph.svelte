@@ -104,7 +104,7 @@
 
 		for (let i = 0; i < tokens.length; i++) {
 			const t = tokens[i];
-			if (t.head === '_' || t.head === '0' || t.deprel === '_') continue;
+			if (t.head === '_' || t.head === '0') continue;
 			const headIdx = idToIndex.get(t.head);
 			if (headIdx === undefined) continue;
 			const span = Math.abs(i - headIdx);
@@ -118,12 +118,13 @@
 
 		for (let i = 0; i < tokens.length; i++) {
 			const t = tokens[i];
-			if (t.head === '_' || t.head === '0' || t.deprel === '_') continue;
+			if (t.head === '_' || t.head === '0') continue;
 			const headIdx = idToIndex.get(t.head);
 			if (headIdx === undefined) continue;
 			const span = Math.abs(i - headIdx);
-			const color = DEPREL_COLORS[t.deprel] ?? DEPREL_COLORS[t.deprel.split(':')[0]] ?? DEFAULT_ARC_COLOR;
-			arcData.push({ from: i, to: headIdx, label: t.deprel, span, color });
+			const label = t.deprel === '_' ? '' : t.deprel;
+			const color = (label ? DEPREL_COLORS[label] ?? DEPREL_COLORS[label.split(':')[0]] : undefined) ?? DEFAULT_ARC_COLOR;
+			arcData.push({ from: i, to: headIdx, label, span, color });
 		}
 
 		arcData.sort((a, b) => a.span - b.span);
@@ -177,7 +178,7 @@
 	function rootArcs(): Array<{ tokenIdx: number; deprel: string }> {
 		return layout.tokens
 			.map((t, i) => ({ tokenIdx: i, deprel: t.deprel, head: t.head }))
-			.filter((t) => t.head === '0' && t.deprel !== '_');
+			.filter((t) => t.head === '0');
 	}
 
 	function handleTokenClick(tokenId: string) {
@@ -229,6 +230,11 @@
 
 {#if layout.tokens.length > 0}
 	<div class="relative">
+		{#if layout.arcs.length === 0 && rootArcs().length === 0}
+			<p class="px-2 py-1 text-xs text-muted-foreground">
+				Set HEAD values in the table below to see dependency arcs. Use <kbd class="rounded bg-muted px-1 font-mono text-[10px]">Set HEAD</kbd> mode to click-assign heads in the graph.
+			</p>
+		{/if}
 		<!-- Export buttons -->
 		<div class="absolute right-2 top-1 z-10 flex gap-1">
 			<button
@@ -265,7 +271,7 @@
 					{@const fromX = layout.tokens[arc.from].x}
 					{@const y = arcBaseY}
 					<polygon
-						points="{fromX - 3},{y - 2} {fromX + 3},{y - 2} {fromX},{y + 2}"
+						points="{toX - 3},{y - 2} {toX + 3},{y - 2} {toX},{y + 2}"
 						fill={arc.color}
 						opacity="0.8"
 					/>
