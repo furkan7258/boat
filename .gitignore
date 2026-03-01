@@ -2,6 +2,22 @@ __pycache__/
 .DS_Store
 treebank_uploads/
 
+# Python
+*.pyc
+.venv/
+.venvs/
+*.egg-info/
+dist/
+
+# Testing / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+
 # LaTeX
 *.abs
 *.aux
