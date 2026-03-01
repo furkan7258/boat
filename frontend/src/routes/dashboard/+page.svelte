@@ -4,19 +4,26 @@
 	import { listTreebanks } from '$api/treebanks';
 	import { getMyAnnotations } from '$api/annotations';
 	import type { TreebankWithProgress, AnnotationDetail } from '$api/types';
+	import StatusBadge from '$components/common/StatusBadge.svelte';
+	import Skeleton from '$components/common/Skeleton.svelte';
+	import { FolderTree, FileText, PenLine, CheckCircle2 } from 'lucide-svelte';
 
 	let treebanks = $state<TreebankWithProgress[]>([]);
+	let allAnnotations = $state<AnnotationDetail[]>([]);
 	let recentAnnotations = $state<AnnotationDetail[]>([]);
 	let loading = $state(true);
 
-	const statusLabels = ['New', 'Draft', 'Complete'];
-
 	let totalAnnotations = $state(0);
+	let completedCount = $state(0);
+	let lastDraft = $state<AnnotationDetail | null>(null);
 
 	onMount(async () => {
 		const [tb, ann] = await Promise.all([listTreebanks(), getMyAnnotations()]);
 		treebanks = tb;
+		allAnnotations = ann;
 		totalAnnotations = ann.length;
+		completedCount = ann.filter((a) => a.status === 2).length;
+		lastDraft = ann.find((a) => a.status === 1) ?? null;
 		recentAnnotations = ann.slice(0, 5);
 		loading = false;
 	});
@@ -30,22 +37,71 @@
 	<h1 class="mb-6 text-2xl font-bold">Welcome, {$user?.first_name || $user?.username}</h1>
 
 	{#if loading}
-		<p class="text-muted-foreground">Loading...</p>
+		<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			{#each Array(4) as _}
+				<div class="rounded-lg border border-border p-5">
+					<Skeleton class="mb-2 h-4 w-24" />
+					<Skeleton class="h-8 w-16" />
+				</div>
+			{/each}
+		</div>
+		<Skeleton class="mb-3 h-6 w-32" />
+		<div class="space-y-2">
+			{#each Array(3) as _}
+				<Skeleton class="h-12 w-full rounded-lg" />
+			{/each}
+		</div>
 	{:else}
-		<div class="mb-8 grid gap-4 sm:grid-cols-3">
+		<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 			<div class="rounded-lg border border-border p-5">
-				<p class="text-sm text-muted-foreground">Treebanks</p>
-				<p class="text-3xl font-bold">{treebanks.length}</p>
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<FolderTree class="h-4 w-4" />
+					<span>Treebanks</span>
+				</div>
+				<p class="mt-1 text-3xl font-bold">{treebanks.length}</p>
 			</div>
 			<div class="rounded-lg border border-border p-5">
-				<p class="text-sm text-muted-foreground">Total sentences</p>
-				<p class="text-3xl font-bold">{totalSentences()}</p>
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<FileText class="h-4 w-4" />
+					<span>Total sentences</span>
+				</div>
+				<p class="mt-1 text-3xl font-bold">{totalSentences()}</p>
 			</div>
 			<div class="rounded-lg border border-border p-5">
-				<p class="text-sm text-muted-foreground">My annotations</p>
-				<p class="text-3xl font-bold">{totalAnnotations}</p>
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<PenLine class="h-4 w-4" />
+					<span>My annotations</span>
+				</div>
+				<p class="mt-1 text-3xl font-bold">{totalAnnotations}</p>
+			</div>
+			<div class="rounded-lg border border-border p-5">
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<CheckCircle2 class="h-4 w-4" />
+					<span>Completed</span>
+				</div>
+				<p class="mt-1 text-3xl font-bold">{completedCount}</p>
 			</div>
 		</div>
+
+		{#if lastDraft}
+			<section class="mb-8">
+				<h2 class="mb-3 text-lg font-semibold">Continue where you left off</h2>
+				<a
+					href="/annotate/{lastDraft.treebank_title}/{lastDraft.sentence_order}"
+					class="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 transition-colors hover:bg-primary/10"
+				>
+					<div>
+						<p class="text-sm font-medium">{lastDraft.sentence_sent_id}</p>
+						<p class="text-xs text-muted-foreground max-w-md truncate">{lastDraft.sentence_text}</p>
+					</div>
+					<div class="flex items-center gap-2">
+						<StatusBadge status={lastDraft.status} />
+						<span class="text-xs text-muted-foreground">{lastDraft.treebank_title}</span>
+						<span class="text-sm text-primary font-medium">Continue &rarr;</span>
+					</div>
+				</a>
+			</section>
+		{/if}
 
 		{#if treebanks.length > 0}
 			<section class="mb-8">
@@ -94,9 +150,7 @@
 							<div>
 								<span class="text-sm font-medium">{ann.sentence_sent_id ?? `#${ann.sentence_id}`}</span>
 								<span class="ml-2 text-xs text-muted-foreground">{ann.treebank_title}</span>
-								<span class="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-									{statusLabels[ann.status]}
-								</span>
+								<StatusBadge status={ann.status} />
 							</div>
 							<a href="/annotate/{ann.treebank_title}/{ann.sentence_order}" class="text-sm text-primary hover:underline">Edit</a>
 						</div>

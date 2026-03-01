@@ -51,6 +51,9 @@ export function createShortcutManager() {
 		},
 		detach() {
 			window.removeEventListener('keydown', handleKeydown);
+		},
+		getShortcuts(): Shortcut[] {
+			return shortcuts;
 		}
 	};
 }

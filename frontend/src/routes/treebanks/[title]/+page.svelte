@@ -8,6 +8,10 @@
 	import Button from '$components/common/Button.svelte';
 	import Input from '$components/common/Input.svelte';
 	import Modal from '$components/common/Modal.svelte';
+	import Breadcrumb from '$components/layout/Breadcrumb.svelte';
+	import EmptyState from '$components/common/EmptyState.svelte';
+	import Skeleton from '$components/common/Skeleton.svelte';
+	import { FileText } from 'lucide-svelte';
 
 	const treebankTitle = $derived(decodeURIComponent(page.params.title));
 
@@ -102,16 +106,37 @@
 
 <div class="mx-auto max-w-7xl px-4 py-8">
 	{#if loading}
-		<p class="text-muted-foreground">Loading...</p>
+		<div class="mb-6">
+			<Skeleton class="mb-2 h-4 w-48" />
+			<Skeleton class="mb-1 h-8 w-64" />
+			<Skeleton class="h-4 w-24" />
+		</div>
+		<div class="overflow-hidden rounded-lg border border-border">
+			{#each Array(5) as _}
+				<div class="flex items-center gap-4 border-t border-border px-4 py-3">
+					<Skeleton class="h-4 w-8" />
+					<Skeleton class="h-4 w-24" />
+					<Skeleton class="h-4 w-full max-w-sm" />
+				</div>
+			{/each}
+		</div>
 	{:else if treebank}
 		<div class="mb-6">
-			<div class="mb-1 flex items-center gap-3">
-				<a href="/treebanks" class="text-sm text-muted-foreground hover:text-foreground">&larr; Treebanks</a>
+			<div class="mb-2">
+				<Breadcrumb crumbs={[{ label: 'Treebanks', href: '/treebanks' }, { label: treebank.title }]} />
 			</div>
 			<div class="flex items-center justify-between">
 				<div>
 					<h1 class="text-2xl font-bold">{treebank.title}</h1>
-					<p class="text-sm text-muted-foreground">{treebank.language}</p>
+					<div class="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+						<span>{treebank.language}</span>
+						<span class="text-border">|</span>
+						<span>{allSentences.length} sentences</span>
+						{#if treebank.created_at}
+							<span class="text-border">|</span>
+							<span>Created {new Date(treebank.created_at).toLocaleDateString()}</span>
+						{/if}
+					</div>
 				</div>
 				<div class="flex gap-2">
 					<a
@@ -126,9 +151,12 @@
 		</div>
 
 		{#if allSentences.length === 0}
-			<div class="rounded-lg border border-dashed border-border py-12 text-center">
-				<p class="text-muted-foreground">No sentences yet. Upload a CoNLL-U file or add sentences manually.</p>
-			</div>
+			<EmptyState icon={FileText} title="No sentences yet" description="Upload a CoNLL-U file or add sentences manually.">
+				<div class="flex gap-2">
+					<Button variant="outline" size="sm" onclick={() => (showUpload = true)}>Upload CoNLL-U</Button>
+					<Button variant="outline" size="sm" onclick={() => (showAdd = true)}>Add sentence</Button>
+				</div>
+			</EmptyState>
 		{:else}
 			<div class="overflow-hidden rounded-lg border border-border">
 				<table class="w-full text-sm">

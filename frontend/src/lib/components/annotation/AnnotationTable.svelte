@@ -71,25 +71,26 @@
 		<thead>
 			<tr class="bg-muted">
 				{#each columns as col}
-					<th class="border-r border-border px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wider">
+					<th class="border-r border-b-2 border-border px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wider">
 						{COLUMN_LABELS[col] ?? col}
 					</th>
 				{/each}
-				<th class="w-16 px-2 py-1.5 text-xs font-semibold"></th>
+				<th class="w-16 border-b-2 border-border px-2 py-1.5 text-xs font-semibold"></th>
 			</tr>
 		</thead>
 		<tbody>
-			{#each $cells as cell (cell.id_f)}
+			{#each $cells as cell, idx (cell.id_f)}
 				{@const isMultiword = cell.id_f.includes('-')}
 				{@const isSelected = cell.id_f === selectedTokenId}
+				{@const isEven = idx % 2 === 0}
 				<tr
-					class="border-t border-border hover:bg-muted/30 {isMultiword ? 'opacity-70' : ''} {isSelected ? 'bg-blue-50 dark:bg-blue-950/30' : ''}"
+					class="border-t border-border hover:bg-muted/30 {isMultiword ? 'opacity-70' : ''} {isSelected ? 'bg-blue-50 dark:bg-blue-950/30' : isEven ? 'bg-muted/20' : ''}"
 					onclick={() => onTokenSelect?.(cell.id_f)}
 				>
 					{#each columns as col}
 						{@const error = cellError(cell, col)}
 						{#if col === 'id_f'}
-							<td class="border-r border-border px-2 py-0.5 text-xs font-mono text-muted-foreground">
+							<td class="border-r border-border px-2 py-1 text-xs font-mono text-muted-foreground">
 								{cell.id_f}
 							</td>
 						{:else if col === 'upos'}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cells, updateCell, type Cell, type CellField } from '$stores/annotation';
+	import { toast } from '$stores/toast';
 
 	interface Props {
 		visibleColumns: string[];
@@ -225,6 +226,7 @@
 
 		const text = lines.join('\n');
 		navigator.clipboard.writeText(text);
+		toast.success('LaTeX copied to clipboard');
 	}
 </script>
 
@@ -314,8 +316,9 @@
 							height={TOKEN_H}
 							rx="3"
 							fill={tok.id_f === selectedTokenId ? '#dbeafe' : 'transparent'}
-							stroke={tok.id_f === selectedTokenId ? '#3b82f6' : '#e5e5e5'}
-							stroke-width={tok.id_f === selectedTokenId ? 2 : 1}
+							stroke={tok.id_f === selectedTokenId ? '#3b82f6' : headSelectionMode ? '#93c5fd' : '#e5e5e5'}
+							stroke-width={tok.id_f === selectedTokenId ? 2 : headSelectionMode ? 1.5 : 1}
+							stroke-dasharray={headSelectionMode && tok.id_f !== selectedTokenId ? '3,2' : 'none'}
 						/>
 						<text
 							x={tok.x}

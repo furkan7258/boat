@@ -6,6 +6,7 @@
 	import { initialize, isAuthenticated, isLoading } from '$stores/auth';
 	import { theme } from '$stores/theme';
 	import Navbar from '$components/layout/Navbar.svelte';
+	import Toast from '$components/common/Toast.svelte';
 
 	let { children } = $props();
 
@@ -43,3 +44,4 @@
 	{/if}
 	{@render children()}
 {/if}
+<Toast />

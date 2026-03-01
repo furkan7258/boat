@@ -65,6 +65,17 @@
 		}
 	}
 
+	function handlePaste(e: ClipboardEvent) {
+		e.preventDefault();
+		const text = e.clipboardData?.getData('text/plain') ?? '';
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0) return;
+		const range = sel.getRangeAt(0);
+		range.deleteContents();
+		range.insertNode(document.createTextNode(text));
+		range.collapse(false);
+	}
+
 	function handleFocus() {
 		// Select all text on focus
 		if (cellEl) {
@@ -84,10 +95,11 @@
 		contenteditable="true"
 		role="textbox"
 		tabindex="0"
-		class="min-w-[2rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+		class="min-w-[2.5rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring focus:bg-background"
 		onblur={handleBlur}
 		onkeydown={handleKeydown}
 		onfocus={handleFocus}
+		onpaste={handlePaste}
 	>
 		{value}
 	</div>

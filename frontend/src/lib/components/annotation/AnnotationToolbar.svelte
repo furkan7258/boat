@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { status, isDirty, canUndo, canRedo, isSaving, undo, redo, resetToInitial, notes } from '$stores/annotation';
+	import { STATUS_CONFIG } from '$utils/status';
 	import Button from '$components/common/Button.svelte';
+	import Tooltip from '$components/common/Tooltip.svelte';
 
 	interface Props {
 		visibleColumns: string[];
@@ -16,7 +18,6 @@
 	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, onstatuschange, hasPrev, hasNext }: Props = $props();
 
 	const allColumns = ['ID', 'FORM', 'LEMMA', 'UPOS', 'XPOS', 'FEATS', 'HEAD', 'DEPREL', 'DEPS', 'MISC'];
-	const statusLabels = ['New', 'Draft', 'Complete'];
 
 	let showNotes = $state(false);
 
@@ -33,21 +34,29 @@
 	<!-- Top row: navigation + save -->
 	<div class="flex items-center justify-between gap-2">
 		<div class="flex items-center gap-2">
-			<Button variant="outline" size="sm" onclick={onprev} disabled={!hasPrev}>
-				Prev
-			</Button>
-			<Button variant="outline" size="sm" onclick={onnext} disabled={!hasNext}>
-				Next
-			</Button>
+			<Tooltip text="Previous sentence (Alt+P)">
+				<Button variant="outline" size="sm" onclick={onprev} disabled={!hasPrev}>
+					Prev
+				</Button>
+			</Tooltip>
+			<Tooltip text="Next sentence (Alt+N)">
+				<Button variant="outline" size="sm" onclick={onnext} disabled={!hasNext}>
+					Next
+				</Button>
+			</Tooltip>
 		</div>
 
 		<div class="flex items-center gap-2">
-			<Button variant="ghost" size="sm" onclick={undo} disabled={!$canUndo}>
-				Undo
-			</Button>
-			<Button variant="ghost" size="sm" onclick={redo} disabled={!$canRedo}>
-				Redo
-			</Button>
+			<Tooltip text="Undo (Ctrl+Z)">
+				<Button variant="ghost" size="sm" onclick={undo} disabled={!$canUndo}>
+					Undo
+				</Button>
+			</Tooltip>
+			<Tooltip text="Redo (Ctrl+Y)">
+				<Button variant="ghost" size="sm" onclick={redo} disabled={!$canRedo}>
+					Redo
+				</Button>
+			</Tooltip>
 			<Button variant="ghost" size="sm" onclick={resetToInitial} disabled={!$isDirty}>
 				Reset
 			</Button>
@@ -60,18 +69,20 @@
 				onchange={(e) => onstatuschange(Number((e.target as HTMLSelectElement).value))}
 				class="h-8 rounded-md border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
 			>
-				{#each statusLabels as label, i}
-					<option value={i}>{label}</option>
+				{#each STATUS_CONFIG as cfg, i}
+					<option value={i}>{cfg.label}</option>
 				{/each}
 			</select>
 
-			<Button
-				size="sm"
-				onclick={onsave}
-				disabled={$isSaving}
-			>
-				{$isSaving ? 'Saving...' : $isDirty ? 'Save *' : 'Save'}
-			</Button>
+			<Tooltip text="Save annotation (Alt+S)">
+				<Button
+					size="sm"
+					onclick={onsave}
+					disabled={$isSaving}
+				>
+					{$isSaving ? 'Saving...' : $isDirty ? 'Save *' : 'Save'}
+				</Button>
+			</Tooltip>
 		</div>
 	</div>
 

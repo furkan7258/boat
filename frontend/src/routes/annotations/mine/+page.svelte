@@ -3,9 +3,12 @@
 	import { getMyAnnotations } from '$api/annotations';
 	import type { AnnotationDetail } from '$api/types';
 	import Button from '$components/common/Button.svelte';
+	import StatusBadge from '$components/common/StatusBadge.svelte';
+	import EmptyState from '$components/common/EmptyState.svelte';
+	import Skeleton from '$components/common/Skeleton.svelte';
+	import { PenLine } from 'lucide-svelte';
 
 	const statusLabels = ['New', 'Draft', 'Complete'];
-	const statusColors = ['bg-muted', 'bg-warning/10 text-warning', 'bg-success/10 text-success'];
 
 	let annotations = $state<AnnotationDetail[]>([]);
 	let loading = $state(true);
@@ -49,20 +52,30 @@
 	</div>
 
 	{#if loading}
-		<p class="text-muted-foreground">Loading...</p>
-	{:else if annotations.length === 0}
-		<div class="rounded-lg border border-dashed border-border py-12 text-center">
-			<p class="text-muted-foreground">No annotations yet.</p>
-			<a href="/treebanks" class="mt-2 inline-block text-sm text-primary hover:underline">Browse treebanks</a>
+		<div class="space-y-2">
+			{#each Array(5) as _}
+				<div class="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+					<div class="flex items-center gap-3">
+						<Skeleton class="h-5 w-16 rounded-full" />
+						<div>
+							<Skeleton class="mb-1 h-4 w-32" />
+							<Skeleton class="h-3 w-48" />
+						</div>
+					</div>
+					<Skeleton class="h-4 w-16" />
+				</div>
+			{/each}
 		</div>
+	{:else if annotations.length === 0}
+		<EmptyState icon={PenLine} title="No annotations yet" description="Start annotating sentences from a treebank.">
+			<a href="/treebanks" class="text-sm text-primary hover:underline">Browse treebanks</a>
+		</EmptyState>
 	{:else}
 		<div class="space-y-2">
 			{#each annotations as ann}
 				<div class="flex items-center justify-between rounded-lg border border-border px-4 py-3 hover:bg-muted/50">
 					<div class="flex items-center gap-3">
-						<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusColors[ann.status]}">
-							{statusLabels[ann.status]}
-						</span>
+						<StatusBadge status={ann.status} />
 						<div>
 							<p class="text-sm font-medium">{ann.sentence_sent_id}</p>
 							<p class="text-xs text-muted-foreground max-w-lg truncate">{ann.sentence_text}</p>

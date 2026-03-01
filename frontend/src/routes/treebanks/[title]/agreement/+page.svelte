@@ -5,6 +5,7 @@
 	import { listSentences, getSentenceDiff } from '$api/sentences';
 	import type { TreebankRead, SentenceBrief, AgreementResponse, DiffResponse } from '$api/types';
 	import DiffView from '$components/graph/DiffView.svelte';
+	import Breadcrumb from '$components/layout/Breadcrumb.svelte';
 
 	const treebankTitle = $derived(decodeURIComponent(page.params.title));
 
@@ -50,8 +51,8 @@
 </script>
 
 <div class="mx-auto max-w-7xl px-4 py-8">
-	<div class="mb-1">
-		<a href="/treebanks/{treebankTitle}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
+	<div class="mb-2">
+		<Breadcrumb crumbs={[{ label: 'Treebanks', href: '/treebanks' }, { label: treebank?.title ?? '...', href: `/treebanks/${treebankTitle}` }, { label: 'Agreement' }]} />
 	</div>
 	<h1 class="mb-6 text-2xl font-bold">Inter-Annotator Agreement</h1>
 

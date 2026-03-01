@@ -27,7 +27,7 @@
 <nav class="border-b border-border bg-background">
 	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
 		<div class="flex items-center gap-6">
-			<a href="/dashboard" class="text-lg font-bold tracking-tight">BoAT</a>
+			<a href="/dashboard" class="text-lg font-bold tracking-tight font-brand">BoAT</a>
 			<div class="hidden items-center gap-4 text-sm md:flex">
 				<a href="/treebanks" class="text-muted-foreground hover:text-foreground transition-colors">
 					Treebanks

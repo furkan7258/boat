@@ -7,6 +7,9 @@
 	import Button from '$components/common/Button.svelte';
 	import Input from '$components/common/Input.svelte';
 	import Modal from '$components/common/Modal.svelte';
+	import EmptyState from '$components/common/EmptyState.svelte';
+	import Skeleton from '$components/common/Skeleton.svelte';
+	import { TreePine, LayoutGrid, LayoutList } from 'lucide-svelte';
 
 	let treebanks = $state<TreebankWithProgress[]>([]);
 	let languages = $state<Record<string, string>>({});
@@ -21,6 +24,9 @@
 	// Delete modal
 	let showDelete = $state(false);
 	let deleteTarget = $state<TreebankWithProgress | null>(null);
+
+	// View mode
+	let viewMode = $state<'table' | 'cards'>('table');
 
 	onMount(async () => {
 		const [tb, langs] = await Promise.all([listTreebanks(), getLanguages()]);
@@ -60,15 +66,65 @@
 <div class="mx-auto max-w-7xl px-4 py-8">
 	<div class="mb-6 flex items-center justify-between">
 		<h1 class="text-2xl font-bold">Treebanks</h1>
-		<Button onclick={() => (showCreate = true)}>New treebank</Button>
+		<div class="flex items-center gap-2">
+			<div class="flex rounded-md border border-border">
+				<button
+					onclick={() => (viewMode = 'table')}
+					class="rounded-l-md px-2 py-1.5 cursor-pointer {viewMode === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+				>
+					<LayoutList class="h-4 w-4" />
+				</button>
+				<button
+					onclick={() => (viewMode = 'cards')}
+					class="rounded-r-md px-2 py-1.5 cursor-pointer {viewMode === 'cards' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+				>
+					<LayoutGrid class="h-4 w-4" />
+				</button>
+			</div>
+			<Button onclick={() => (showCreate = true)}>New treebank</Button>
+		</div>
 	</div>
 
 	{#if loading}
-		<p class="text-muted-foreground">Loading...</p>
+		<div class="overflow-hidden rounded-lg border border-border">
+			<div class="bg-muted px-4 py-3">
+				<Skeleton class="h-4 w-full max-w-md" />
+			</div>
+			{#each Array(4) as _}
+				<div class="flex items-center gap-4 border-t border-border px-4 py-3">
+					<Skeleton class="h-4 w-32" />
+					<Skeleton class="h-4 w-16" />
+					<Skeleton class="h-4 w-12" />
+					<Skeleton class="h-4 w-12" />
+					<Skeleton class="h-2 w-20 rounded-full" />
+				</div>
+			{/each}
+		</div>
 	{:else if treebanks.length === 0}
-		<div class="rounded-lg border border-dashed border-border py-12 text-center">
-			<p class="text-muted-foreground">No treebanks yet.</p>
-			<Button variant="outline" class="mt-3" onclick={() => (showCreate = true)}>Create your first treebank</Button>
+		<EmptyState icon={TreePine} title="No treebanks yet" description="Create a treebank to start annotating.">
+			<Button variant="outline" onclick={() => (showCreate = true)}>Create your first treebank</Button>
+		</EmptyState>
+	{:else if viewMode === 'cards'}
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			{#each treebanks as tb}
+				{@const pct = tb.sentence_count > 0 ? Math.round((tb.complete_count / tb.sentence_count) * 100) : 0}
+				<a href="/treebanks/{tb.title}" class="group rounded-lg border border-border p-4 transition-colors hover:border-primary/30 hover:bg-muted/30">
+					<div class="mb-3 flex items-center justify-between">
+						<h3 class="font-medium text-primary group-hover:underline">{tb.title}</h3>
+						<span class="text-xs text-muted-foreground">{tb.language}</span>
+					</div>
+					<div class="mb-3 flex items-center gap-2">
+						<div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+							<div class="h-full bg-primary transition-all" style="width: {pct}%"></div>
+						</div>
+						<span class="text-xs text-muted-foreground">{pct}%</span>
+					</div>
+					<div class="flex gap-4 text-xs text-muted-foreground">
+						<span>{tb.sentence_count} sentences</span>
+						<span>{tb.annotation_count} annotations</span>
+					</div>
+				</a>
+			{/each}
 		</div>
 	{:else}
 		<div class="overflow-hidden rounded-lg border border-border">
