@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { getTreebank, uploadConllu, exportConllu } from '$api/treebanks';
 	import { listSentences, createSentence, deleteSentence } from '$api/sentences';
-	import { createAnnotation } from '$api/annotations';
 	import { ApiError } from '$api/client';
 	import type { TreebankRead, SentenceBrief } from '$api/types';
 	import Button from '$components/common/Button.svelte';
@@ -17,6 +16,7 @@
 	let loading = $state(true);
 	let currentPage = $state(0);
 	const pageSize = 20;
+	let allSentences = $state<SentenceBrief[]>([]);
 
 	// Add sentence
 	let showAdd = $state(false);
@@ -34,22 +34,25 @@
 	let showDelete = $state(false);
 	let deleteTarget = $state<SentenceBrief | null>(null);
 
+	const paginatedSentences = $derived(
+		allSentences.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+	);
+
 	onMount(loadData);
 
 	async function loadData() {
 		loading = true;
 		const [tb, sents] = await Promise.all([
 			getTreebank(treebankId),
-			listSentences(treebankId, currentPage * pageSize, pageSize)
+			listSentences(treebankId)
 		]);
 		treebank = tb;
-		sentences = sents;
+		allSentences = sents;
 		loading = false;
 	}
 
-	async function goPage(p: number) {
+	function goPage(p: number) {
 		currentPage = p;
-		sentences = await listSentences(treebankId, currentPage * pageSize, pageSize);
 	}
 
 	async function handleAddSentence(e: SubmitEvent) {
@@ -73,7 +76,7 @@
 		if (!uploadFile) return;
 		try {
 			const result = await uploadConllu(treebankId, uploadFile);
-			uploadMsg = `Imported ${result.created_sentences} sentences.`;
+			uploadMsg = `Imported ${result.sentences_created} sentences.`;
 			uploadFile = null;
 			await loadData();
 		} catch (err) {
@@ -89,15 +92,8 @@
 		await loadData();
 	}
 
-	async function annotate(sentence: SentenceBrief) {
-		// Create annotation for current user, then navigate to editor
-		try {
-			const ann = await createAnnotation(sentence.id);
-			window.location.href = `/annotate/${treebankId}/${sentence.order}`;
-		} catch (err) {
-			// If annotation already exists, navigate anyway
-			window.location.href = `/annotate/${treebankId}/${sentence.order}`;
-		}
+	function annotate(sentence: SentenceBrief) {
+		window.location.href = `/annotate/${treebankId}/${sentence.order}`;
 	}
 
 	function onFileChange(e: Event) {
@@ -126,18 +122,12 @@
 					>Agreement</a>
 					<Button variant="outline" onclick={() => (showUpload = true)}>Upload CoNLL-U</Button>
 					<Button variant="outline" onclick={() => (showAdd = true)}>Add sentence</Button>
-					<a
-						href={exportConllu(treebank.id)}
-						download
-						class="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-					>
-						Export
-					</a>
+					<Button variant="outline" onclick={() => exportConllu(treebank!.id)}>Export</Button>
 				</div>
 			</div>
 		</div>
 
-		{#if sentences.length === 0}
+		{#if allSentences.length === 0}
 			<div class="rounded-lg border border-dashed border-border py-12 text-center">
 				<p class="text-muted-foreground">No sentences yet. Upload a CoNLL-U file or add sentences manually.</p>
 			</div>
@@ -153,7 +143,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each sentences as sent}
+						{#each paginatedSentences as sent}
 							<tr class="border-t border-border hover:bg-muted/50">
 								<td class="px-4 py-3 text-muted-foreground">{sent.order}</td>
 								<td class="px-4 py-3 font-mono text-xs">{sent.sent_id}</td>
@@ -189,7 +179,7 @@
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={sentences.length < pageSize}
+					disabled={(currentPage + 1) * pageSize >= allSentences.length}
 					onclick={() => goPage(currentPage + 1)}
 				>
 					Next

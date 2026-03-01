@@ -2,7 +2,7 @@ import { api } from './client';
 import type { AnnotationRead, AnnotationDetail, WordLineRead } from './types';
 
 export function createAnnotation(sentenceId: number) {
-	return api.post<AnnotationRead>('/annotations/', { sentence_id: sentenceId });
+	return api.post<AnnotationRead>('/annotations', { sentence_id: sentenceId });
 }
 
 export function getAnnotation(id: number) {

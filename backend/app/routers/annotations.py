@@ -291,4 +291,6 @@ def _build_annotation_detail(a: Annotation) -> AnnotationDetail:
         sentence_text=a.sentence.text,
         sentence_comments=a.sentence.comments,
         treebank_title=a.sentence.treebank.title,
+        treebank_id=a.sentence.treebank.id,
+        sentence_order=a.sentence.order,
     )

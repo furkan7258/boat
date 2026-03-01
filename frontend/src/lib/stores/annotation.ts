@@ -76,8 +76,8 @@ export function loadAnnotation(detail: AnnotationDetail) {
 	initialCells.set(structuredClone(wordlines));
 	annotationId.set(detail.id);
 	sentenceId.set(detail.sentence_id);
-	sentId.set(detail.sentence_sent_id);
-	sentenceText.set(detail.sentence_text);
+	sentId.set(detail.sentence_sent_id ?? '');
+	sentenceText.set(detail.sentence_text ?? '');
 	sentenceComments.set(detail.sentence_comments);
 	status.set(detail.status);
 	notes.set(detail.notes ?? '');

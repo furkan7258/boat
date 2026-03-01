@@ -123,14 +123,18 @@ docker compose -f docker-compose.dev.yml up --build
 # DB: localhost:5432 (boat/boat)
 ```
 
-### Docker (Production)
+### Docker (Production via Cloudflare Tunnel)
 
 ```bash
 cp .env.example .env
 # Edit .env — set POSTGRES_PASSWORD, SECRET_KEY, DOMAIN
 
 docker compose up -d --build
-# HTTPS via Caddy at https://$DOMAIN
+# Caddy listens on 127.0.0.1:8880 (HTTP only)
+# Add to cloudflared config:
+#   - hostname: $DOMAIN
+#     service: http://localhost:8880
+# TLS is terminated at the Cloudflare edge
 ```
 
 ## API Structure
@@ -162,7 +166,7 @@ Health check: `GET /health` (no /api prefix).
 | POSTGRES_DB | No | boat | DB name |
 | ACCESS_TOKEN_EXPIRE_MINUTES | No | 480 | JWT token lifetime |
 | ALLOWED_ORIGINS | No | `["https://$DOMAIN"]` | CORS origins |
-| DOMAIN | No | localhost | Domain for Caddy HTTPS |
+| DOMAIN | No | localhost | Domain for CORS + SvelteKit ORIGIN |
 
 ## Key Patterns
 

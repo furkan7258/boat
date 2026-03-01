@@ -123,8 +123,8 @@
 					<tbody>
 						{#each results as r}
 							<tr class="border-t border-border hover:bg-muted/50">
-								<td class="px-3 py-2 font-mono text-xs">{r.sent_id}</td>
-								<td class="px-3 py-2 max-w-xs truncate">{r.text}</td>
+								<td class="px-3 py-2 font-mono text-xs">{r.sentence_sent_id}</td>
+								<td class="px-3 py-2 max-w-xs truncate">{r.sentence_text}</td>
 								<td class="px-3 py-2 text-muted-foreground">{r.treebank_title}</td>
 								<td class="px-3 py-2 font-medium">{r.form}</td>
 								<td class="px-3 py-2">{r.upos}</td>

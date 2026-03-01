@@ -3,28 +3,27 @@
 	import { page } from '$app/state';
 	import { getTreebank, getAgreement } from '$api/treebanks';
 	import { listSentences, getSentenceDiff } from '$api/sentences';
-	import type { TreebankRead, SentenceBrief, DiffToken } from '$api/types';
+	import type { TreebankRead, SentenceBrief, AgreementResponse, DiffResponse } from '$api/types';
 	import DiffView from '$components/graph/DiffView.svelte';
-	import Button from '$components/common/Button.svelte';
 
 	const treebankId = $derived(Number(page.params.id));
 
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);
-	let agreement = $state<{ scores: Record<string, unknown>[] } | null>(null);
+	let agreement = $state<AgreementResponse | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 
 	// Diff for selected sentence
 	let selectedSentence = $state<SentenceBrief | null>(null);
-	let diffTokens = $state<DiffToken[]>([]);
+	let diff = $state<DiffResponse | null>(null);
 	let diffLoading = $state(false);
 
 	onMount(async () => {
 		try {
 			const [tb, sents, agr] = await Promise.all([
 				getTreebank(treebankId),
-				listSentences(treebankId, 0, 1000),
+				listSentences(treebankId),
 				getAgreement(treebankId)
 			]);
 			treebank = tb;
@@ -41,22 +40,12 @@
 		selectedSentence = sent;
 		diffLoading = true;
 		try {
-			diffTokens = await getSentenceDiff(sent.id);
-		} catch (err) {
-			diffTokens = [];
+			diff = await getSentenceDiff(sent.id);
+		} catch {
+			diff = null;
 		} finally {
 			diffLoading = false;
 		}
-	}
-
-	// Compute overall score from agreement data
-	function overallScore(): string {
-		if (!agreement?.scores || agreement.scores.length === 0) return 'N/A';
-		const scores = agreement.scores
-			.filter((s: any) => typeof s.score === 'number' && s.score >= 0)
-			.map((s: any) => s.score as number);
-		if (scores.length === 0) return 'N/A';
-		return (scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(3);
 	}
 </script>
 
@@ -74,8 +63,12 @@
 		<!-- Overall score -->
 		<div class="mb-6 rounded-lg border border-border p-5">
 			<p class="text-sm text-muted-foreground">Overall agreement score</p>
-			<p class="text-4xl font-bold">{overallScore()}</p>
-			<p class="text-xs text-muted-foreground mt-1">Averaged across UPOS, FEATS, HEAD, DEPREL for all sentence pairs</p>
+			<p class="text-4xl font-bold">
+				{agreement && agreement.sentences_scored > 0 ? agreement.agreement.toFixed(3) : 'N/A'}
+			</p>
+			<p class="text-xs text-muted-foreground mt-1">
+				{agreement?.sentences_scored ?? 0} sentences scored. Averaged across UPOS, FEATS, HEAD, DEPREL.
+			</p>
 		</div>
 
 		<!-- Per-sentence breakdown -->
@@ -106,8 +99,10 @@
 						<p class="mb-3 text-xs text-muted-foreground">{selectedSentence.text}</p>
 						{#if diffLoading}
 							<p class="text-xs text-muted-foreground">Loading diff...</p>
+						{:else if diff}
+							<DiffView tokens={diff.tokens} />
 						{:else}
-							<DiffView tokens={diffTokens} />
+							<p class="text-xs text-muted-foreground">Need at least 2 annotations to compare.</p>
 						{/if}
 					</div>
 				{:else}

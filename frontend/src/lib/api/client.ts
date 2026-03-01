@@ -27,6 +27,10 @@ async function request<T>(
 	}
 	const res = await fetch(`${BASE}${path}`, { ...options, headers });
 	if (!res.ok) {
+		if (res.status === 401 && typeof window !== 'undefined') {
+			localStorage.removeItem('token');
+			window.location.href = '/login';
+		}
 		const body = await res.json().catch(() => ({ detail: res.statusText }));
 		throw new ApiError(res.status, body.detail ?? res.statusText);
 	}

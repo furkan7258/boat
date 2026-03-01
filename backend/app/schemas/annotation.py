@@ -38,3 +38,5 @@ class AnnotationDetail(AnnotationRead):
     sentence_text: str | None = None
     sentence_comments: dict | None = None
     treebank_title: str | None = None
+    treebank_id: int | None = None
+    sentence_order: int | None = None

@@ -54,15 +54,9 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "127.0.0.1:8880:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
     depends_on:
       - backend
       - frontend
@@ -73,5 +67,3 @@ services:
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:

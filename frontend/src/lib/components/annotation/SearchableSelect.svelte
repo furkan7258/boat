@@ -9,9 +9,14 @@
 	let { value, options, onchange, class: className = '' }: Props = $props();
 
 	let open = $state(false);
-	let filter = $state(value);
+	let filter = $state('');
 	let inputEl: HTMLInputElement | undefined = $state();
 	let highlightIdx = $state(0);
+
+	// Sync filter with external value changes when dropdown is closed
+	$effect(() => {
+		if (!open) filter = value;
+	});
 
 	const filtered = $derived(
 		filter

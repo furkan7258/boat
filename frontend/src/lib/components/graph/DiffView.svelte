@@ -9,10 +9,23 @@
 
 	// Get all annotator usernames from the first token
 	const annotators = $derived(
-		tokens.length > 0 ? Object.keys(tokens[0].annotations) : []
+		tokens.length > 0 ? tokens[0].annotators.map((a) => a.username) : []
 	);
 
 	const DIFF_FIELDS = ['upos', 'head', 'deprel', 'feats'];
+
+	function getAnnotatorValue(tok: DiffToken, username: string, field: string): string {
+		const ann = tok.annotators.find((a) => a.username === username);
+		return ann?.values?.[field] ?? '_';
+	}
+
+	function getForm(tok: DiffToken): string {
+		// Get form from first annotator that has values
+		for (const a of tok.annotators) {
+			if (a.values?.form) return a.values.form;
+		}
+		return '_';
+	}
 </script>
 
 {#if tokens.length > 0 && annotators.length >= 2}
@@ -37,11 +50,11 @@
 					{@const hasDisagreement = tok.disagreements.length > 0}
 					<tr class="border-t border-border {hasDisagreement ? 'bg-destructive/5' : ''}">
 						<td class="border-r border-border px-2 py-1 font-mono text-muted-foreground">{tok.id_f}</td>
-						<td class="border-r border-border px-2 py-1 font-medium">{tok.form}</td>
+						<td class="border-r border-border px-2 py-1 font-medium">{getForm(tok)}</td>
 						{#each DIFF_FIELDS as field}
 							{@const isDisagreed = tok.disagreements.includes(field)}
 							{#each annotators as ann}
-								{@const val = tok.annotations[ann]?.[field] ?? '_'}
+								{@const val = getAnnotatorValue(tok, ann, field)}
 								<td class="border-r border-border px-2 py-1 {isDisagreed ? 'bg-destructive/10 text-destructive font-semibold' : 'text-muted-foreground'}">
 									{val}
 								</td>

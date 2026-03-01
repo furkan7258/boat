@@ -3,17 +3,20 @@
 	import { user } from '$stores/auth';
 	import { listTreebanks } from '$api/treebanks';
 	import { getMyAnnotations } from '$api/annotations';
-	import type { TreebankWithProgress, AnnotationRead } from '$api/types';
+	import type { TreebankWithProgress, AnnotationDetail } from '$api/types';
 
 	let treebanks = $state<TreebankWithProgress[]>([]);
-	let recentAnnotations = $state<AnnotationRead[]>([]);
+	let recentAnnotations = $state<AnnotationDetail[]>([]);
 	let loading = $state(true);
 
 	const statusLabels = ['New', 'Draft', 'Complete'];
 
+	let totalAnnotations = $state(0);
+
 	onMount(async () => {
 		const [tb, ann] = await Promise.all([listTreebanks(), getMyAnnotations()]);
 		treebanks = tb;
+		totalAnnotations = ann.length;
 		recentAnnotations = ann.slice(0, 5);
 		loading = false;
 	});
@@ -40,7 +43,7 @@
 			</div>
 			<div class="rounded-lg border border-border p-5">
 				<p class="text-sm text-muted-foreground">My annotations</p>
-				<p class="text-3xl font-bold">{recentAnnotations.length}</p>
+				<p class="text-3xl font-bold">{totalAnnotations}</p>
 			</div>
 		</div>
 
@@ -89,12 +92,13 @@
 					{#each recentAnnotations as ann}
 						<div class="flex items-center justify-between rounded-lg border border-border px-4 py-3">
 							<div>
-								<span class="text-sm font-medium">Sentence #{ann.sentence_id}</span>
+								<span class="text-sm font-medium">{ann.sentence_sent_id ?? `#${ann.sentence_id}`}</span>
+								<span class="ml-2 text-xs text-muted-foreground">{ann.treebank_title}</span>
 								<span class="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 									{statusLabels[ann.status]}
 								</span>
 							</div>
-							<a href="/annotations/mine" class="text-sm text-primary hover:underline">View</a>
+							<a href="/annotate/{ann.treebank_id}/{ann.sentence_order}" class="text-sm text-primary hover:underline">Edit</a>
 						</div>
 					{/each}
 				</div>

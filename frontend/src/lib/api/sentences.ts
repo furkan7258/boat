@@ -1,8 +1,8 @@
 import { api } from './client';
-import type { SentenceBrief, SentenceRead, AnnotationRead, DiffToken } from './types';
+import type { SentenceBrief, SentenceRead, AnnotationRead, DiffResponse } from './types';
 
-export function listSentences(treebankId: number, skip = 0, limit = 20) {
-	return api.get<SentenceBrief[]>(`/sentences/?treebank_id=${treebankId}&skip=${skip}&limit=${limit}`);
+export function listSentences(treebankId: number) {
+	return api.get<SentenceBrief[]>(`/treebanks/${treebankId}/sentences`);
 }
 
 export function getSentence(id: number) {
@@ -10,7 +10,7 @@ export function getSentence(id: number) {
 }
 
 export function createSentence(treebankId: number, sentId: string, text: string) {
-	return api.post<SentenceRead>('/sentences/', { treebank_id: treebankId, sent_id: sentId, text });
+	return api.post<SentenceRead>(`/sentences?treebank_id=${treebankId}`, { sent_id: sentId, text });
 }
 
 export function deleteSentence(id: number) {
@@ -22,5 +22,5 @@ export function listSentenceAnnotations(id: number) {
 }
 
 export function getSentenceDiff(id: number) {
-	return api.get<DiffToken[]>(`/sentences/${id}/diff`);
+	return api.get<DiffResponse>(`/sentences/${id}/diff`);
 }

@@ -103,13 +103,12 @@
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex gap-2">
-									<a
-										href={exportConllu(tb.id)}
-										download
-										class="text-xs text-muted-foreground hover:text-foreground"
+									<button
+										onclick={() => exportConllu(tb.id)}
+										class="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
 									>
 										Export
-									</a>
+									</button>
 									<button
 										onclick={() => confirmDelete(tb)}
 										class="text-xs text-destructive hover:text-destructive/80 cursor-pointer"

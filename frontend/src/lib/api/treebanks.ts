@@ -1,8 +1,8 @@
 import { api } from './client';
-import type { TreebankRead, TreebankWithProgress } from './types';
+import type { TreebankRead, TreebankWithProgress, AgreementResponse } from './types';
 
 export function listTreebanks() {
-	return api.get<TreebankWithProgress[]>('/treebanks/');
+	return api.get<TreebankWithProgress[]>('/treebanks');
 }
 
 export function getTreebank(id: number) {
@@ -10,7 +10,7 @@ export function getTreebank(id: number) {
 }
 
 export function createTreebank(title: string, language: string) {
-	return api.post<TreebankRead>('/treebanks/', { title, language });
+	return api.post<TreebankRead>('/treebanks', { title, language });
 }
 
 export function deleteTreebank(id: number) {
@@ -20,15 +20,26 @@ export function deleteTreebank(id: number) {
 export function uploadConllu(id: number, file: File) {
 	const formData = new FormData();
 	formData.append('file', file);
-	return api.upload<{ created_sentences: number }>(`/treebanks/${id}/upload`, formData);
+	return api.upload<{ sentences_created: number }>(`/treebanks/${id}/upload`, formData);
 }
 
-export function exportConllu(id: number): string {
-	return `/api/treebanks/${id}/export`;
+export async function exportConllu(id: number) {
+	const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+	const headers: Record<string, string> = {};
+	if (token) headers['Authorization'] = `Bearer ${token}`;
+	const res = await fetch(`/api/treebanks/${id}/export`, { headers });
+	if (!res.ok) throw new Error('Export failed');
+	const blob = await res.blob();
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = `treebank-${id}.conllu`;
+	a.click();
+	URL.revokeObjectURL(url);
 }
 
 export function getAgreement(id: number) {
-	return api.get<{ treebank_id: number; scores: Record<string, unknown>[] }>(`/treebanks/${id}/agreement`);
+	return api.get<AgreementResponse>(`/treebanks/${id}/agreement`);
 }
 
 export function getLanguages() {

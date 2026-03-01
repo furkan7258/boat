@@ -21,8 +21,13 @@
 		return m;
 	}
 
-	let feats = $state(parseFeats(value));
+	let feats = $state<Map<string, string>>(new Map());
 	const featureKeys = Object.keys(FEATURES);
+
+	// Parse when value prop changes (e.g., opened for a different cell)
+	$effect(() => {
+		feats = parseFeats(value);
+	});
 
 	function setFeat(key: string, val: string) {
 		const next = new Map(feats);
@@ -66,8 +71,9 @@
 			{#each featureKeys as key}
 				{@const currentVal = feats.get(key) ?? ''}
 				<div class="flex items-center gap-1.5">
-					<label class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</label>
+					<label for="feat-{key}" class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</label>
 					<select
+						id="feat-{key}"
 						value={currentVal}
 						onchange={(e) => setFeat(key, (e.target as HTMLSelectElement).value)}
 						class="flex-1 h-7 rounded border border-input bg-background px-1 text-xs focus-visible:ring-2 focus-visible:ring-ring {currentVal ? 'text-foreground' : 'text-muted-foreground'}"

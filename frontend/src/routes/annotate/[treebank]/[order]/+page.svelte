@@ -74,7 +74,7 @@
 			const [detail, tb, sents] = await Promise.all([
 				getAnnotationByPosition(treebankId, order),
 				getTreebank(treebankId),
-				listSentences(treebankId, 0, 1000)
+				listSentences(treebankId)
 			]);
 			loadAnnotation(detail);
 			treebank = tb;
