@@ -75,6 +75,102 @@ async def create_annotation(
     return annotation
 
 
+@router.get(
+    "/by-position/",
+    response_model=AnnotationDetail,
+)
+async def get_annotation_by_position(
+    treebank_id: int,
+    order: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get (or create) the current user's annotation for a sentence at a given order."""
+    # Find the sentence
+    result = await db.execute(
+        select(Sentence).where(
+            Sentence.treebank_id == treebank_id,
+            Sentence.order == order,
+        )
+    )
+    sentence = result.scalar_one_or_none()
+    if not sentence:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sentence not found at this position")
+
+    # Find user's annotation for this sentence
+    result = await db.execute(
+        select(Annotation)
+        .where(
+            Annotation.sentence_id == sentence.id,
+            Annotation.annotator_id == current_user.id,
+            Annotation.is_template.is_(False),
+        )
+        .options(
+            selectinload(Annotation.wordlines),
+            selectinload(Annotation.annotator),
+            selectinload(Annotation.sentence).selectinload(Sentence.treebank),
+        )
+        .limit(1)
+    )
+    annotation = result.scalar_one_or_none()
+
+    if not annotation:
+        # Auto-create from template
+        annotation = Annotation(
+            annotator_id=current_user.id,
+            sentence_id=sentence.id,
+            status=0,
+        )
+        db.add(annotation)
+
+        # Copy wordlines from template
+        tmpl_result = await db.execute(
+            select(Annotation)
+            .where(
+                Annotation.sentence_id == sentence.id,
+                Annotation.is_template.is_(True),
+            )
+            .options(selectinload(Annotation.wordlines))
+            .limit(1)
+        )
+        template = tmpl_result.scalar_one_or_none()
+        await db.flush()
+
+        if template and template.wordlines:
+            for wl in template.wordlines:
+                new_wl = WordLine(
+                    annotation_id=annotation.id,
+                    id_f=wl.id_f,
+                    form=wl.form,
+                    lemma=wl.lemma,
+                    upos=wl.upos,
+                    xpos=wl.xpos,
+                    feats=wl.feats,
+                    head=wl.head,
+                    deprel=wl.deprel,
+                    deps=wl.deps,
+                    misc=wl.misc,
+                )
+                new_wl.populate_parsed_fields()
+                db.add(new_wl)
+
+        await db.commit()
+
+        # Reload with relationships
+        result = await db.execute(
+            select(Annotation)
+            .where(Annotation.id == annotation.id)
+            .options(
+                selectinload(Annotation.wordlines),
+                selectinload(Annotation.annotator),
+                selectinload(Annotation.sentence).selectinload(Sentence.treebank),
+            )
+        )
+        annotation = result.scalar_one()
+
+    return _build_annotation_detail(annotation)
+
+
 @router.get("/{annotation_id}", response_model=AnnotationDetail)
 async def get_annotation(
     annotation_id: int,

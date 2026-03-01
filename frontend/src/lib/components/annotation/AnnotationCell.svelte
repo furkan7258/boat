@@ -1,0 +1,83 @@
+<script lang="ts">
+	import type { CellField } from '$stores/annotation';
+
+	interface Props {
+		value: string;
+		field: CellField;
+		tokenId: string;
+		onchange: (tokenId: string, field: CellField, value: string) => void;
+	}
+
+	let { value, field, tokenId, onchange }: Props = $props();
+
+	let cellEl: HTMLElement | undefined = $state();
+
+	function handleBlur() {
+		if (!cellEl) return;
+		const newValue = cellEl.textContent?.trim() ?? '';
+		if (newValue !== value) {
+			onchange(tokenId, field, newValue);
+		}
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			cellEl?.blur();
+		}
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			cellEl?.blur();
+			// Move to next cell
+			const next = e.shiftKey
+				? cellEl?.parentElement?.previousElementSibling?.querySelector<HTMLElement>('[contenteditable]')
+				: cellEl?.parentElement?.nextElementSibling?.querySelector<HTMLElement>('[contenteditable]');
+			next?.focus();
+		}
+		if (e.key === 'Escape') {
+			if (cellEl) cellEl.textContent = value;
+			cellEl?.blur();
+		}
+		// Shift+Arrow navigation between rows
+		if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				e.preventDefault();
+				cellEl?.blur();
+				const row = cellEl?.closest('tr');
+				const targetRow = e.key === 'ArrowDown' ? row?.nextElementSibling : row?.previousElementSibling;
+				if (targetRow) {
+					const cellIndex = Array.from(row?.children ?? []).indexOf(cellEl?.parentElement!);
+					const targetCell = targetRow.children[cellIndex]?.querySelector<HTMLElement>('[contenteditable]');
+					targetCell?.focus();
+				}
+			}
+		}
+	}
+
+	function handleFocus() {
+		// Select all text on focus
+		if (cellEl) {
+			const range = document.createRange();
+			range.selectNodeContents(cellEl);
+			const sel = window.getSelection();
+			sel?.removeAllRanges();
+			sel?.addRange(range);
+		}
+	}
+</script>
+
+<td class="border-r border-border px-1 py-0.5">
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		bind:this={cellEl}
+		contenteditable="true"
+		role="textbox"
+		tabindex="0"
+		class="min-w-[2rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+		onblur={handleBlur}
+		onkeydown={handleKeydown}
+		onfocus={handleFocus}
+	>
+		{value}
+	</div>
+</td>
