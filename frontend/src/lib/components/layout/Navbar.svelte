@@ -1,11 +1,27 @@
 <script lang="ts">
 	import { user, logout } from '$stores/auth';
+	import { theme } from '$stores/theme';
 	import { goto } from '$app/navigation';
 
 	async function handleLogout() {
 		logout();
 		await goto('/login');
 	}
+
+	let currentTheme = $state<string>('system');
+	theme.subscribe((v) => (currentTheme = v));
+
+	function cycleTheme() {
+		const order = ['light', 'dark', 'system'] as const;
+		type T = (typeof order)[number];
+		const idx = order.indexOf(currentTheme as T);
+		const next = order[(idx + 1) % order.length];
+		theme.set(next);
+	}
+
+	const themeIcon = $derived(
+		currentTheme === 'light' ? '\u2600' : currentTheme === 'dark' ? '\u263E' : '\u25D0'
+	);
 </script>
 
 <nav class="border-b border-border bg-background">
@@ -25,6 +41,11 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-4 text-sm">
+			<button
+				onclick={cycleTheme}
+				class="text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-base"
+				title="Toggle theme (light/dark/system)"
+			>{themeIcon}</button>
 			{#if $user}
 				<a href="/preferences" class="text-muted-foreground hover:text-foreground transition-colors">
 					{$user.username}

@@ -120,6 +120,10 @@
 					<p class="text-sm text-muted-foreground">{treebank.language}</p>
 				</div>
 				<div class="flex gap-2">
+					<a
+						href="/treebanks/{treebankId}/agreement"
+						class="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+					>Agreement</a>
 					<Button variant="outline" onclick={() => (showUpload = true)}>Upload CoNLL-U</Button>
 					<Button variant="outline" onclick={() => (showAdd = true)}>Add sentence</Button>
 					<a

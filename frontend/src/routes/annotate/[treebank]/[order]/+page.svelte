@@ -17,14 +17,16 @@
 		notes,
 		isDirty,
 		isSaving,
-		getCellsForSave
+		getCellsForSave,
+		updateCell
 	} from '$stores/annotation';
-	import { currentColumns } from '$stores/preferences';
+	import { currentColumns, graphPreference } from '$stores/preferences';
 	import { createShortcutManager } from '$utils/keyboard';
 	import { undo, redo } from '$stores/annotation';
 	import AnnotationTable from '$components/annotation/AnnotationTable.svelte';
 	import AnnotationToolbar from '$components/annotation/AnnotationToolbar.svelte';
 	import CommentsPanel from '$components/annotation/CommentsPanel.svelte';
+	import DisplacyGraph from '$components/graph/DisplacyGraph.svelte';
 	import type { TreebankRead } from '$api/types';
 
 	const treebankId = $derived(Number(page.params.treebank));
@@ -36,11 +38,17 @@
 	let maxOrder = $state(0);
 	let visibleColumns = $state<string[]>([]);
 	let showComments = $state(false);
+	let showGraph = $state(true);
+
+	// Click-to-set-HEAD mode
+	let selectedTokenId = $state<string | null>(null);
+	let headSelectionMode = $state(false);
 
 	const shortcutManager = createShortcutManager();
 
 	onMount(async () => {
 		visibleColumns = $currentColumns;
+		showGraph = $graphPreference !== 0;
 		shortcutManager.register([
 			{ key: 'p', alt: true, handler: goPrev, description: 'Previous sentence' },
 			{ key: 'n', alt: true, handler: goNext, description: 'Next sentence' },
@@ -48,6 +56,8 @@
 			{ key: 'z', ctrl: true, handler: undo, description: 'Undo' },
 			{ key: 'y', ctrl: true, handler: redo, description: 'Redo' },
 			{ key: 'd', alt: true, handler: () => (showComments = !showComments), description: 'Toggle discussion' },
+			{ key: 'g', alt: true, handler: () => (showGraph = !showGraph), description: 'Toggle graph' },
+			{ key: 'h', alt: true, handler: () => (headSelectionMode = !headSelectionMode), description: 'Toggle HEAD selection mode' },
 		]);
 		shortcutManager.attach();
 		await loadPage();
@@ -85,7 +95,6 @@
 				status: $annotationStatus,
 				notes: $notes,
 			});
-			// Reload to get fresh state
 			const detail = await getAnnotationByPosition(treebankId, order);
 			loadAnnotation(detail);
 		} catch (err) {
@@ -116,6 +125,20 @@
 	function handleColumnsChange(cols: string[]) {
 		visibleColumns = cols;
 	}
+
+	function handleTokenSelect(tokenId: string) {
+		selectedTokenId = tokenId;
+	}
+
+	function handleGraphTokenClick(tokenId: string) {
+		if (headSelectionMode && selectedTokenId && selectedTokenId !== tokenId) {
+			// Set the HEAD of selectedTokenId to tokenId
+			updateCell(selectedTokenId, 'head', tokenId);
+			headSelectionMode = false;
+		} else {
+			selectedTokenId = tokenId;
+		}
+	}
 </script>
 
 <div class="flex h-screen flex-col">
@@ -125,14 +148,21 @@
 			<a href="/treebanks/{treebankId}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
 			<span class="text-sm font-mono text-muted-foreground">#{$sentId}</span>
 		</div>
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-3 text-sm">
+			<button
+				onclick={() => (showGraph = !showGraph)}
+				class="text-muted-foreground hover:text-foreground cursor-pointer {showGraph ? 'text-primary' : ''}"
+			>Graph</button>
+			<button
+				onclick={() => { headSelectionMode = !headSelectionMode; }}
+				class="cursor-pointer {headSelectionMode ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}"
+				title="Click a token in the table, then click its HEAD in the graph (Alt+H)"
+			>{headSelectionMode ? 'HEAD mode ON' : 'Set HEAD'}</button>
 			<button
 				onclick={() => (showComments = !showComments)}
-				class="text-sm text-muted-foreground hover:text-foreground cursor-pointer"
-			>
-				Discussion
-			</button>
-			<a href="/dashboard" class="text-sm text-muted-foreground hover:text-foreground">Home</a>
+				class="text-muted-foreground hover:text-foreground cursor-pointer {showComments ? 'text-primary' : ''}"
+			>Discussion</button>
+			<a href="/dashboard" class="text-muted-foreground hover:text-foreground">Home</a>
 		</div>
 	</div>
 
@@ -175,8 +205,26 @@
 						hasNext={order < maxOrder}
 					/>
 				</div>
+
 				<div class="flex-1 overflow-auto px-3 pb-3">
-					<AnnotationTable {visibleColumns} />
+					<!-- Graph above table (hybrid layout) -->
+					{#if showGraph}
+						<div class="mb-2 rounded-lg border border-border bg-background p-2">
+							<DisplacyGraph
+								{visibleColumns}
+								{selectedTokenId}
+								{headSelectionMode}
+								onTokenClick={handleGraphTokenClick}
+							/>
+						</div>
+					{/if}
+
+					<!-- Annotation table -->
+					<AnnotationTable
+						{visibleColumns}
+						{selectedTokenId}
+						onTokenSelect={handleTokenSelect}
+					/>
 				</div>
 			</div>
 

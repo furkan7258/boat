@@ -1,0 +1,121 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import { getTreebank, getAgreement } from '$api/treebanks';
+	import { listSentences, getSentenceDiff } from '$api/sentences';
+	import type { TreebankRead, SentenceBrief, DiffToken } from '$api/types';
+	import DiffView from '$components/graph/DiffView.svelte';
+	import Button from '$components/common/Button.svelte';
+
+	const treebankId = $derived(Number(page.params.id));
+
+	let treebank = $state<TreebankRead | null>(null);
+	let sentences = $state<SentenceBrief[]>([]);
+	let agreement = $state<{ scores: Record<string, unknown>[] } | null>(null);
+	let loading = $state(true);
+	let error = $state('');
+
+	// Diff for selected sentence
+	let selectedSentence = $state<SentenceBrief | null>(null);
+	let diffTokens = $state<DiffToken[]>([]);
+	let diffLoading = $state(false);
+
+	onMount(async () => {
+		try {
+			const [tb, sents, agr] = await Promise.all([
+				getTreebank(treebankId),
+				listSentences(treebankId, 0, 1000),
+				getAgreement(treebankId)
+			]);
+			treebank = tb;
+			sentences = sents;
+			agreement = agr;
+		} catch (err) {
+			error = String(err);
+		} finally {
+			loading = false;
+		}
+	});
+
+	async function viewDiff(sent: SentenceBrief) {
+		selectedSentence = sent;
+		diffLoading = true;
+		try {
+			diffTokens = await getSentenceDiff(sent.id);
+		} catch (err) {
+			diffTokens = [];
+		} finally {
+			diffLoading = false;
+		}
+	}
+
+	// Compute overall score from agreement data
+	function overallScore(): string {
+		if (!agreement?.scores || agreement.scores.length === 0) return 'N/A';
+		const scores = agreement.scores
+			.filter((s: any) => typeof s.score === 'number' && s.score >= 0)
+			.map((s: any) => s.score as number);
+		if (scores.length === 0) return 'N/A';
+		return (scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(3);
+	}
+</script>
+
+<div class="mx-auto max-w-7xl px-4 py-8">
+	<div class="mb-1">
+		<a href="/treebanks/{treebankId}" class="text-sm text-muted-foreground hover:text-foreground">&larr; {treebank?.title ?? 'Back'}</a>
+	</div>
+	<h1 class="mb-6 text-2xl font-bold">Inter-Annotator Agreement</h1>
+
+	{#if loading}
+		<p class="text-muted-foreground">Computing agreement...</p>
+	{:else if error}
+		<div class="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>
+	{:else}
+		<!-- Overall score -->
+		<div class="mb-6 rounded-lg border border-border p-5">
+			<p class="text-sm text-muted-foreground">Overall agreement score</p>
+			<p class="text-4xl font-bold">{overallScore()}</p>
+			<p class="text-xs text-muted-foreground mt-1">Averaged across UPOS, FEATS, HEAD, DEPREL for all sentence pairs</p>
+		</div>
+
+		<!-- Per-sentence breakdown -->
+		<h2 class="mb-3 text-lg font-semibold">Per-sentence comparison</h2>
+		<p class="mb-3 text-sm text-muted-foreground">Click a sentence to view the side-by-side diff between annotators.</p>
+
+		<div class="grid gap-2 lg:grid-cols-3">
+			<!-- Sentence list -->
+			<div class="lg:col-span-1 space-y-1 max-h-[60vh] overflow-auto">
+				{#each sentences as sent}
+					{@const isSelected = selectedSentence?.id === sent.id}
+					<button
+						onclick={() => viewDiff(sent)}
+						class="w-full text-left rounded-md border px-3 py-2 text-xs transition-colors cursor-pointer
+							{isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}"
+					>
+						<span class="font-mono text-muted-foreground">{sent.sent_id}</span>
+						<span class="ml-2 truncate">{sent.text}</span>
+					</button>
+				{/each}
+			</div>
+
+			<!-- Diff view -->
+			<div class="lg:col-span-2">
+				{#if selectedSentence}
+					<div class="rounded-lg border border-border p-4">
+						<h3 class="mb-1 text-sm font-semibold">{selectedSentence.sent_id}</h3>
+						<p class="mb-3 text-xs text-muted-foreground">{selectedSentence.text}</p>
+						{#if diffLoading}
+							<p class="text-xs text-muted-foreground">Loading diff...</p>
+						{:else}
+							<DiffView tokens={diffTokens} />
+						{/if}
+					</div>
+				{:else}
+					<div class="flex h-40 items-center justify-center rounded-lg border border-dashed border-border">
+						<p class="text-sm text-muted-foreground">Select a sentence to view the diff</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+</div>

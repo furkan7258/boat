@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { initialize, isAuthenticated, isLoading } from '$stores/auth';
+	import { theme } from '$stores/theme';
 	import Navbar from '$components/layout/Navbar.svelte';
 
 	let { children } = $props();
@@ -11,6 +12,7 @@
 	const publicRoutes = ['/login', '/register'];
 
 	onMount(async () => {
+		theme.initialize();
 		await initialize();
 	});
 
