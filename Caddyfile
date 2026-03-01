@@ -1,0 +1,22 @@
+{$DOMAIN:localhost} {
+	# API requests → backend
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Health check passthrough
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else → SvelteKit frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	# Logging
+	log {
+		output stdout
+		format console
+	}
+}
