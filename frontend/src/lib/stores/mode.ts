@@ -3,7 +3,7 @@ import { writable, derived } from 'svelte/store';
 export type AppMode = 'web' | 'offline' | 'connected';
 
 function detectInitialMode(): AppMode {
-	if (typeof window !== 'undefined' && (window as Record<string, unknown>).isTauri) {
+	if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).isTauri) {
 		return 'offline';
 	}
 	return 'web';
