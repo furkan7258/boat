@@ -80,7 +80,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: frontend
-          args: ${{ matrix.args }} --config ci.conf.json
+          args: ${{ matrix.args }} --config src-tauri/ci.conf.json
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
