@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Collaborative web tool for linguistic annotation of Universal Dependencies treebanks. Rewritten from Django + jQuery to a modern stack.
+Collaborative tool for linguistic annotation of Universal Dependencies treebanks. Available as a web app and a Tauri desktop app.
 
 ## Stack
 
@@ -47,16 +47,22 @@ backend/
 frontend/
   src/
     lib/
-      api/              # Typed fetch client (client.ts + per-resource modules)
+      api/              # Typed fetch client (mode-aware: fetch or Tauri invoke)
       components/
         annotation/     # AnnotationTable, Cell, Toolbar, SearchableSelect, FeatsEditor
         graph/          # DisplacyGraph (SVG arcs), DiffView
-        common/         # Button, Input, Modal
-        layout/         # Navbar
-      stores/           # auth, annotation, preferences, theme
+        common/         # Button, Input, Modal, Toast, Tooltip, Skeleton
+        layout/         # Navbar, Breadcrumb
+        desktop/        # ConnectDialog, DesktopShortcuts
+      stores/           # auth, annotation, mode, preferences, theme, toast
       utils/            # keyboard shortcuts, cn(), ud-tagsets
     routes/             # SvelteKit pages
     app.css             # Tailwind 4 theme + dark mode
+  src-tauri/            # Tauri v2 Rust backend (desktop app)
+    src/
+      commands.rs       # API dispatch + file I/O commands
+      conllu.rs         # CoNLL-U parser/exporter (Rust)
+      document.rs       # In-memory document state
   Dockerfile            # Production (multi-stage, adapter-node)
   Dockerfile.dev        # Development (hot reload)
 
@@ -189,6 +195,5 @@ cd backend && python -m pytest tests/ -v
 
 ## Git
 
-- Branch: `rewrite` (based off `main`)
-- Previous stack (Django) is preserved in `main` until rewrite is complete
+- Default branch: `main`
 - CI runs on all branches; Docker image builds only on `main`

@@ -151,11 +151,14 @@ frontend/              # SvelteKit frontend (shared between web and desktop)
       conllu.rs        # CoNLL-U parser/exporter (Rust port)
       document.rs      # In-memory document state
 
-conllu/                # Sample CoNLL-U files for testing
 docker-compose.yml     # Production deployment
 docker-compose.dev.yml # Development with hot reload
 Caddyfile              # Reverse proxy config
 ```
+
+## Publications
+
+- Akkurt, F., Marşan, B., & Üsküdarlı, S. (2022). BoAT v2 — A Web-Based Dependency Annotation Tool with Focus on Agglutinative Languages. In *Proceedings of ALTNLP 2022*. [[arXiv]](https://arxiv.org/abs/2207.01327) [[CEUR-WS]](https://ceur-ws.org/)
 
 ## History
 

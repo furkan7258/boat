@@ -18,24 +18,9 @@ htmlcov/
 # Environment
 .env
 
-# LaTeX
-*.abs
-*.aux
-*.bbl
-*.blg
-*.glo
-*.ist
-*.log
-*.out
-*.xmpdata
-
 node_modules/
 build/
 
 # Tauri / Rust
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
-
-# app-qt
-app-qt/notes-*.txt
-app-qt/tools/
