@@ -9,6 +9,9 @@
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
+  "bundle": {
+    "active": true
+  },
   "app": {
     "windows": [
       {
