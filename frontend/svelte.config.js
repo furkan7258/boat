@@ -1,7 +1,7 @@
 import adapterNode from '@sveltejs/adapter-node';
 import adapterStatic from '@sveltejs/adapter-static';
 
-const isTauri = process.env.TAURI === '1';
+const isTauri = !!process.env.TAURI_ENV_PLATFORM || process.env.TAURI === '1';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

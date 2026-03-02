@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  TAURI: '1'
-
 jobs:
   build:
     strategy:
@@ -66,14 +63,6 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Build frontend
-        run: npm run build
-        working-directory: frontend
-
-      - name: Write CI config override
-        shell: bash
-        run: echo '{"build":{"beforeBuildCommand":""}}' > frontend/src-tauri/ci.conf.json
-
       - name: Build and create release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -81,7 +70,7 @@ jobs:
         with:
           projectPath: frontend
           tauriScript: npx tauri
-          args: ${{ matrix.args }} --config src-tauri/ci.conf.json
+          args: ${{ matrix.args }}
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
