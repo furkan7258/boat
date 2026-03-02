@@ -1,4 +1,6 @@
+import { get } from 'svelte/store';
 import { api } from './client';
+import { appMode, serverUrl } from '$stores/mode';
 import type { TreebankRead, TreebankWithProgress, AgreementResponse } from './types';
 
 export function listTreebanks() {
@@ -28,10 +30,18 @@ export function uploadConllu(id: number, file: File) {
 }
 
 export async function exportConllu(id: number) {
+	// In offline mode, use Tauri save-as dialog
+	if (get(appMode) === 'offline') {
+		const { invoke } = await import('@tauri-apps/api/core');
+		await invoke('save_file_as');
+		return;
+	}
+
+	const base = get(appMode) === 'connected' ? `${get(serverUrl)}/api` : '/api';
 	const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 	const headers: Record<string, string> = {};
 	if (token) headers['Authorization'] = `Bearer ${token}`;
-	const res = await fetch(`/api/treebanks/${id}/export`, { headers });
+	const res = await fetch(`${base}/treebanks/${id}/export`, { headers });
 	if (!res.ok) throw new Error('Export failed');
 	const blob = await res.blob();
 	const url = URL.createObjectURL(blob);

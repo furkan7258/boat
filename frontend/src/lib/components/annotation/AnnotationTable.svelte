@@ -18,9 +18,10 @@
 
 	const columns = $derived(allColumns.filter((c) => visibleColumns.includes(c.toUpperCase()) || c === 'id_f'));
 
-	// FEATS editor state
+	// FEATS/MISC editor state
 	let featsEditToken = $state<string | null>(null);
 	let featsEditValue = $state('');
+	let featsEditField = $state<'feats' | 'misc'>('feats');
 
 	function handleCellChange(tokenId: string, field: CellField, value: string) {
 		updateCell(tokenId, field, value);
@@ -30,14 +31,15 @@
 		updateCell(tokenId, field, value);
 	}
 
-	function openFeatsEditor(tokenId: string, currentValue: string) {
+	function openFeatsEditor(tokenId: string, currentValue: string, field: 'feats' | 'misc' = 'feats') {
 		featsEditToken = tokenId;
 		featsEditValue = currentValue;
+		featsEditField = field;
 	}
 
 	function handleFeatsApply(value: string) {
 		if (featsEditToken) {
-			updateCell(featsEditToken, 'feats', value);
+			updateCell(featsEditToken, featsEditField, value);
 		}
 		featsEditToken = null;
 	}
@@ -109,11 +111,21 @@
 						{:else if col === 'feats'}
 							<td class="border-r border-border px-1 py-0.5">
 								<button
-									onclick={() => openFeatsEditor(cell.id_f, cell.feats)}
+									onclick={() => openFeatsEditor(cell.id_f, cell.feats, 'feats')}
 									class="w-full text-left rounded px-1 py-0.5 text-xs outline-none hover:bg-muted cursor-pointer truncate max-w-[10rem]"
 									title={cell.feats}
 								>
 									{cell.feats === '_' ? '_' : cell.feats}
+								</button>
+							</td>
+						{:else if col === 'misc'}
+							<td class="border-r border-border px-1 py-0.5">
+								<button
+									onclick={() => openFeatsEditor(cell.id_f, cell.misc, 'misc')}
+									class="w-full text-left rounded px-1 py-0.5 text-xs outline-none hover:bg-muted cursor-pointer truncate max-w-[10rem]"
+									title={cell.misc}
+								>
+									{cell.misc === '_' ? '_' : cell.misc}
 								</button>
 							</td>
 						{:else if isEditable(col)}
@@ -155,10 +167,11 @@
 	</table>
 </div>
 
-<!-- FEATS Editor Modal -->
+<!-- FEATS/MISC Editor Modal -->
 {#if featsEditToken}
 	<FeatsEditor
 		value={featsEditValue}
+		field={featsEditField}
 		onchange={handleFeatsApply}
 		onclose={() => (featsEditToken = null)}
 	/>

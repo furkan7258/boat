@@ -1,12 +1,34 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { UserRead } from '$api/types';
 import * as authApi from '$api/auth';
+import { appMode } from '$stores/mode';
 
 export const user = writable<UserRead | null>(null);
 export const isAuthenticated = derived(user, ($user) => $user !== null);
 export const isLoading = writable(true);
 
+const OFFLINE_USER: UserRead = {
+	id: 0,
+	username: 'local',
+	email: '',
+	first_name: 'Local',
+	last_name: 'User',
+	is_active: true,
+	preferences: {
+		graph_preference: 1,
+		error_condition: false,
+		current_columns: ['ID', 'FORM', 'LEMMA', 'UPOS', 'XPOS', 'FEATS', 'HEAD', 'DEPREL', 'DEPS', 'MISC']
+	}
+};
+
 export async function initialize() {
+	// In offline (Tauri) mode, skip server auth entirely
+	if (get(appMode) === 'offline') {
+		user.set(OFFLINE_USER);
+		isLoading.set(false);
+		return;
+	}
+
 	const token = localStorage.getItem('token');
 	if (!token) {
 		isLoading.set(false);

@@ -21,6 +21,7 @@
 		updateCell
 	} from '$stores/annotation';
 	import { currentColumns, graphPreference } from '$stores/preferences';
+	import { appMode } from '$stores/mode';
 	import { createShortcutManager } from '$utils/keyboard';
 	import { undo, redo } from '$stores/annotation';
 	import AnnotationTable from '$components/annotation/AnnotationTable.svelte';
@@ -35,6 +36,7 @@
 
 	const treebankSlug = $derived(decodeURIComponent(page.params.treebank));
 	const order = $derived(Number(page.params.order));
+	const offline = $derived($appMode === 'offline');
 
 	let treebank = $state<TreebankRead | null>(null);
 	let loading = $state(true);
@@ -72,11 +74,29 @@
 			{ key: '?', shift: true, handler: () => (showShortcuts = !showShortcuts), description: 'Show keyboard shortcuts' },
 		]);
 		shortcutManager.attach();
+
+		// Listen for desktop save events (Ctrl+S from DesktopShortcuts)
+		window.addEventListener('boat:save', save);
+		window.addEventListener('boat:save-as', saveAs);
+
 		await loadPage();
 	});
 
 	onDestroy(() => {
 		shortcutManager.detach();
+		window.removeEventListener('boat:save', save);
+		window.removeEventListener('boat:save-as', saveAs);
+	});
+
+	// Update window title in Tauri mode
+	$effect(() => {
+		if ($appMode !== 'web' && treebank) {
+			const dirty = $isDirty ? '[*] ' : '';
+			const title = `${dirty}${treebank.title} — Sentence ${order} — BoAT`;
+			import('@tauri-apps/api/webviewWindow').then(({ getCurrentWebviewWindow }) => {
+				getCurrentWebviewWindow().setTitle(title);
+			}).catch(() => {});
+		}
 	});
 
 	// Warn before closing tab with unsaved changes
@@ -119,6 +139,13 @@
 				status: $annotationStatus,
 				notes: $notes,
 			});
+
+			// In offline mode, also persist to disk
+			if (offline) {
+				const { invoke } = await import('@tauri-apps/api/core');
+				await invoke('save_file');
+			}
+
 			const detail = await getAnnotationByPosition(treebank.id, order);
 			loadAnnotation(detail);
 			toast.success('Annotation saved');
@@ -128,6 +155,19 @@
 			error = msg;
 		} finally {
 			isSaving.set(false);
+		}
+	}
+
+	async function saveAs() {
+		if (!treebank) return;
+		try {
+			const { invoke } = await import('@tauri-apps/api/core');
+			await invoke('save_file_as');
+			toast.success('File saved');
+		} catch (err) {
+			if (err !== 'No file selected') {
+				toast.error(String(err));
+			}
 		}
 	}
 
@@ -173,7 +213,7 @@
 	<div class="flex items-center justify-between border-b border-border bg-background px-4 py-2">
 		<div class="flex items-center gap-4">
 			<Breadcrumb crumbs={[
-				{ label: 'Treebanks', href: '/treebanks' },
+				{ label: offline ? 'Home' : 'Treebanks', href: offline ? '/desktop' : '/treebanks' },
 				{ label: treebank?.title ?? '...', href: `/treebanks/${treebankSlug}` },
 				{ label: `Sentence ${order}` },
 			]} />
@@ -200,19 +240,21 @@
 					class="cursor-pointer {headSelectionMode ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}"
 				>{headSelectionMode ? 'HEAD mode ON' : 'Set HEAD'}</button>
 			</Tooltip>
-			<Tooltip text="Toggle discussion (Alt+D)">
-				<button
-					onclick={() => (showComments = !showComments)}
-					class="text-muted-foreground hover:text-foreground cursor-pointer {showComments ? 'text-primary' : ''}"
-				>Discussion</button>
-			</Tooltip>
+			{#if !offline}
+				<Tooltip text="Toggle discussion (Alt+D)">
+					<button
+						onclick={() => (showComments = !showComments)}
+						class="text-muted-foreground hover:text-foreground cursor-pointer {showComments ? 'text-primary' : ''}"
+					>Discussion</button>
+				</Tooltip>
+			{/if}
 			<Tooltip text="Keyboard shortcuts (?)">
 				<button
 					onclick={() => (showShortcuts = true)}
 					class="text-muted-foreground hover:text-foreground cursor-pointer rounded border border-border px-1.5 py-0.5 text-xs font-mono"
 				>?</button>
 			</Tooltip>
-			<a href="/dashboard" class="text-muted-foreground hover:text-foreground">Home</a>
+			<a href={offline ? '/desktop' : '/dashboard'} class="text-muted-foreground hover:text-foreground">Home</a>
 		</div>
 	</div>
 
@@ -308,8 +350,8 @@
 				</div>
 			</div>
 
-			<!-- Comments panel (toggleable) -->
-			{#if showComments}
+			<!-- Comments panel (toggleable, web/connected only) -->
+			{#if showComments && !offline}
 				<div class="w-80 border-l border-border overflow-auto">
 					<CommentsPanel />
 				</div>
