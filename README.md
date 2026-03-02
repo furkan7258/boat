@@ -1,33 +1,164 @@
 # BoAT
 
-Bogazici University Annotation Tool — a collaborative web tool for linguistic annotation and treebank management.
+Bogazici University Annotation Tool — a collaborative tool for linguistic annotation and treebank management using the [Universal Dependencies](https://universaldependencies.org/) framework.
 
 - **Project page:** [furkanakkurt1335.github.io/projects/boat](https://furkanakkurt1335.github.io/projects/boat)
 - **Wiki:** [gitlab.com/furkan5204/boat/-/wikis](https://gitlab.com/furkan5204/boat/-/wikis/home)
 
-## Description
+## Features
 
-A web application for collaborative dependency annotation using the [Universal Dependencies](https://universaldependencies.org/) framework. Built with Django, PostgreSQL, and Docker.
-
-Features:
 - Sentence-by-sentence annotation (CoNLL-U format)
-- Multi-user collaboration with inter-annotator agreement
 - Dependency graph visualization
+- Multi-user collaboration with inter-annotator agreement
 - Treebank management (create, upload, export)
 - Advanced search and filtering
-- UD validation integration
+- Available as a **web app** and a **desktop app** (Tauri)
 
-## Quick Start
+## Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL |
+| Frontend | SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS 4 |
+| Desktop | Tauri v2 (Rust) — wraps the same SvelteKit frontend |
+| Auth | JWT (python-jose + bcrypt) |
+| Server | Uvicorn + Caddy |
+
+## Quick Start (Web App)
+
+The web app requires all three services: PostgreSQL, the FastAPI backend, and the SvelteKit frontend.
+
+### With Docker (recommended)
 
 ```bash
-cd app/
-docker compose -f docker-compose.dev.yml up --build -d
+cp .env.example .env
+# Edit .env — set POSTGRES_PASSWORD and SECRET_KEY
+
+# Development (hot reload)
+docker compose -f docker-compose.dev.yml up --build
+
+# Backend:  http://localhost:8000 (API docs: /docs)
+# Frontend: http://localhost:5173
 ```
 
-See [app/README.md](app/README.md) and the [wiki](https://gitlab.com/furkan5204/boat/-/wikis/development) for full setup instructions.
+### Without Docker
+
+**Backend:**
+
+```bash
+cd backend
+pip install uv
+uv pip install --system -e ".[dev]"
+
+# Start PostgreSQL, then:
+alembic upgrade head
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Frontend:**
+
+```bash
+cd frontend
+npm ci
+npm run dev
+# Opens at http://localhost:5173, proxies /api → localhost:8000
+```
+
+## Quick Start (Desktop App)
+
+The desktop app wraps the SvelteKit frontend in a Tauri window and works in two modes:
+
+- **Offline** — open `.conllu` files from disk, edit, save (no server needed)
+- **Connected** — point at a running BoAT server, login, annotate as if using the web app
+
+### Prerequisites
+
+**Rust toolchain** (rustup.rs):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**System libraries** (Linux/Ubuntu):
+
+```bash
+sudo apt-get install -y \
+  libwebkit2gtk-4.1-dev \
+  libgtk-3-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  libjavascriptcoregtk-4.1-dev \
+  libsoup-3.0-dev
+```
+
+On macOS, Xcode Command Line Tools are sufficient. On Windows, install the [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) and [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+**Node dependencies:**
+
+```bash
+cd frontend
+npm ci
+```
+
+### Development
+
+```bash
+cd frontend
+npm run tauri:dev
+```
+
+This starts the Vite dev server with `TAURI=1` (using `adapter-static` instead of `adapter-node`) and opens the Tauri window with hot reload.
+
+### Production build
+
+```bash
+cd frontend
+npm run tauri:build
+```
+
+The output binary is in `frontend/src-tauri/target/release/`.
+
+### Usage
+
+When the desktop app opens:
+
+1. **Offline mode** — Click "Open CoNLL-U file" to load a `.conllu` file from disk. Browse sentences, edit annotations in the table, see the dependency graph update live, and save back to disk with `Ctrl+S`.
+2. **Connected mode** — Click "Connect to server", enter the URL of a running BoAT instance (e.g. `http://localhost:8000`), login with your credentials. The app then works identically to the web version.
+
+Desktop keyboard shortcuts: `Ctrl+O` (open file), `Ctrl+S` (save), `Ctrl+Shift+S` (save as).
+
+## Directory Structure
+
+```
+backend/               # FastAPI backend
+  app/
+    routers/           # API route handlers
+    services/          # CoNLL-U parser, agreement calculator
+    models/            # SQLAlchemy models
+  alembic/             # Database migrations
+  tests/               # pytest test suite
+
+frontend/              # SvelteKit frontend (shared between web and desktop)
+  src/
+    lib/
+      api/             # Typed API client (mode-aware: fetch or Tauri invoke)
+      components/      # Svelte components (annotation, graph, layout, desktop)
+      stores/          # State management (auth, annotation, mode, theme)
+    routes/            # SvelteKit pages
+  src-tauri/           # Tauri v2 Rust backend (desktop app)
+    src/
+      commands.rs      # Tauri command handlers (API dispatch, file I/O)
+      conllu.rs        # CoNLL-U parser/exporter (Rust port)
+      document.rs      # In-memory document state
+
+conllu/                # Sample CoNLL-U files for testing
+docker-compose.yml     # Production deployment
+docker-compose.dev.yml # Development with hot reload
+Caddyfile              # Reverse proxy config
+```
 
 ## History
 
 - **Original desktop tool:** [boun-tabi/BoAT](https://github.com/boun-tabi/BoAT) (Qt/Python)
 - **Initial web version:** [GitLab (archived)](https://gitlab.com/furkanakkurt5204/web-annotation-tool)
-- **GitHub mirror:** [github.com/furkan7258/boat](https://github.com/furkan7258/boat) (archived)
+- **Current version:** FastAPI + SvelteKit rewrite with Tauri desktop app
