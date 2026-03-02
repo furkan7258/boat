@@ -2,7 +2,6 @@
 
 Bogazici University Annotation Tool — a collaborative tool for linguistic annotation and treebank management using the [Universal Dependencies](https://universaldependencies.org/) framework.
 
-- **Project page:** [furkanakkurt1335.github.io/projects/boat](https://furkanakkurt1335.github.io/projects/boat)
 - **Wiki:** [gitlab.com/furkan5204/boat/-/wikis](https://gitlab.com/furkan5204/boat/-/wikis/home)
 
 ## Features
@@ -163,5 +162,4 @@ Caddyfile              # Reverse proxy config
 ## History
 
 - **Original desktop tool:** [boun-tabi/BoAT](https://github.com/boun-tabi/BoAT) (Qt/Python)
-- **Initial web version:** [GitLab (archived)](https://gitlab.com/furkanakkurt5204/web-annotation-tool)
 - **Current version:** FastAPI + SvelteKit rewrite with Tauri desktop app
