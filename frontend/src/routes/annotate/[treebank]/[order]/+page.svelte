@@ -34,8 +34,8 @@
 	import { toast } from '$stores/toast';
 	import type { TreebankRead } from '$api/types';
 
-	const treebankSlug = $derived(decodeURIComponent(page.params.treebank));
-	const order = $derived(Number(page.params.order));
+	const treebankSlug = $derived(decodeURIComponent(page.params.treebank!));
+	const order = $derived(Number(page.params.order!));
 	const offline = $derived($appMode === 'offline');
 
 	let treebank = $state<TreebankRead | null>(null);

@@ -13,7 +13,7 @@
 	import Skeleton from '$components/common/Skeleton.svelte';
 	import { FileText } from 'lucide-svelte';
 
-	const treebankTitle = $derived(decodeURIComponent(page.params.title));
+	const treebankTitle = $derived(decodeURIComponent(page.params.title!));
 
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);

@@ -7,7 +7,7 @@
 	import DiffView from '$components/graph/DiffView.svelte';
 	import Breadcrumb from '$components/layout/Breadcrumb.svelte';
 
-	const treebankTitle = $derived(decodeURIComponent(page.params.title));
+	const treebankTitle = $derived(decodeURIComponent(page.params.title!));
 
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);
