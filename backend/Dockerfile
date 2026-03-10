@@ -16,6 +16,8 @@ RUN groupadd -r boat && useradd -r -g boat -d /app -s /sbin/nologin boat
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app
+
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app /app
