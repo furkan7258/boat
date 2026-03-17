@@ -13,7 +13,6 @@
 		sentId,
 		sentenceText,
 		sentenceMetadata,
-		status as annotationStatus,
 		notes,
 		isDirty,
 		isSaving,
@@ -145,7 +144,6 @@
 		try {
 			await updateWordlines($annotationId, getCellsForSave());
 			await updateAnnotation($annotationId, {
-				status: $annotationStatus,
 				notes: $notes,
 			});
 
@@ -192,10 +190,6 @@
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
 		await goto(`/annotate/${treebankSlug}/${order + 1}`);
 		await loadPage();
-	}
-
-	function handleStatusChange(newStatus: number) {
-		annotationStatus.set(newStatus);
 	}
 
 	function handleColumnsChange(cols: string[]) {
@@ -330,7 +324,6 @@
 						onsave={save}
 						onnext={goNext}
 						onprev={goPrev}
-						onstatuschange={handleStatusChange}
 						oncolumnschange={handleColumnsChange}
 						hasPrev={order > 1}
 						hasNext={order < maxOrder}

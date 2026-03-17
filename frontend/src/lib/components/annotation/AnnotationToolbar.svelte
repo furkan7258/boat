@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { status, isDirty, canUndo, canRedo, isSaving, undo, redo, resetToInitial, notes } from '$stores/annotation';
-	import { STATUS_CONFIG } from '$utils/status';
+	import StatusBadge from '$components/common/StatusBadge.svelte';
 	import Button from '$components/common/Button.svelte';
 	import Tooltip from '$components/common/Tooltip.svelte';
 
@@ -10,12 +10,11 @@
 		onsave: () => void;
 		onnext: () => void;
 		onprev: () => void;
-		onstatuschange: (status: number) => void;
 		hasPrev: boolean;
 		hasNext: boolean;
 	}
 
-	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, onstatuschange, hasPrev, hasNext }: Props = $props();
+	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, hasPrev, hasNext }: Props = $props();
 
 	const allColumns = ['ID', 'FORM', 'LEMMA', 'UPOS', 'XPOS', 'FEATS', 'HEAD', 'DEPREL', 'DEPS', 'MISC'];
 
@@ -63,16 +62,7 @@
 		</div>
 
 		<div class="flex items-center gap-3">
-			<!-- Status selector -->
-			<select
-				value={$status}
-				onchange={(e) => onstatuschange(Number((e.target as HTMLSelectElement).value))}
-				class="h-8 rounded-md border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				{#each STATUS_CONFIG as cfg, i}
-					<option value={i}>{cfg.label}</option>
-				{/each}
-			</select>
+			<StatusBadge status={$status} />
 
 			<Tooltip text="Save annotation (Alt+S)">
 				<Button

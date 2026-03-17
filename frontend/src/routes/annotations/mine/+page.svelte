@@ -8,7 +8,7 @@
 	import Skeleton from '$components/common/Skeleton.svelte';
 	import { PenLine } from 'lucide-svelte';
 
-	const statusLabels = ['New', 'Draft', 'Complete'];
+	const statusLabels = ['Untouched', 'Untouched', 'Edited'];
 
 	let annotations = $state<AnnotationDetail[]>([]);
 	let loading = $state(true);

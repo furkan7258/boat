@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.annotation import Annotation
+from app.models.annotation import Annotation, AnnotationStatus
 from app.models.user import User
 from app.models.wordline import WordLine
 from app.schemas.wordline import WordLineBatchUpdate, WordLineRead
@@ -40,6 +41,33 @@ async def batch_update_wordlines(
         wl.populate_parsed_fields()
         db.add(wl)
         new_wordlines.append(wl)
+
+    # Auto-compute status by comparing to template
+    template_result = await db.execute(
+        select(Annotation)
+        .where(
+            Annotation.sentence_id == annotation.sentence_id,
+            Annotation.is_template.is_(True),
+        )
+        .options(selectinload(Annotation.wordlines))
+        .limit(1)
+    )
+    template = template_result.scalar_one_or_none()
+
+    if template and template.wordlines:
+        template_fields = [
+            (wl.id_f, wl.form, wl.lemma, wl.upos, wl.xpos, wl.feats, wl.head, wl.deprel, wl.deps, wl.misc)
+            for wl in sorted(template.wordlines, key=lambda w: w.id_f)
+        ]
+        new_fields = [
+            (wl.id_f, wl.form, wl.lemma, wl.upos, wl.xpos, wl.feats, wl.head, wl.deprel, wl.deps, wl.misc)
+            for wl in sorted(new_wordlines, key=lambda w: w.id_f)
+        ]
+        annotation.status = (
+            AnnotationStatus.COMPLETE if new_fields != template_fields else AnnotationStatus.NEW
+        )
+    else:
+        annotation.status = AnnotationStatus.COMPLETE
 
     await db.commit()
 
