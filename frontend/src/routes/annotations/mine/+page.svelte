@@ -8,7 +8,11 @@
 	import Skeleton from '$components/common/Skeleton.svelte';
 	import { PenLine } from 'lucide-svelte';
 
-	const statusLabels = ['Untouched', 'Untouched', 'Edited'];
+	const statusFilters = [
+		{ label: 'All', value: undefined },
+		{ label: 'Untouched', value: 0 },
+		{ label: 'Edited', value: 2 },
+	] as const;
 
 	let annotations = $state<AnnotationDetail[]>([]);
 	let loading = $state(true);
@@ -33,18 +37,11 @@
 
 	<!-- Status filter -->
 	<div class="mb-4 flex gap-2">
-		<button
-			onclick={() => setFilter(undefined)}
-			class="rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer
-				{filterStatus === undefined ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
-		>
-			All
-		</button>
-		{#each statusLabels as label, i}
+		{#each statusFilters as { label, value }}
 			<button
-				onclick={() => setFilter(i)}
+				onclick={() => setFilter(value)}
 				class="rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer
-					{filterStatus === i ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+					{filterStatus === value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
 			>
 				{label}
 			</button>

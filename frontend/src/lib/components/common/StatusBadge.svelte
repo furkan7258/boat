@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { STATUS_CONFIG } from '$utils/status';
+	import { getStatusConfig } from '$utils/status';
 
 	interface Props {
 		status: number;
@@ -7,7 +7,7 @@
 
 	let { status }: Props = $props();
 
-	const config = $derived(STATUS_CONFIG[status] ?? STATUS_CONFIG[0]);
+	const config = $derived(getStatusConfig(status));
 </script>
 
 <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {config.color}">
