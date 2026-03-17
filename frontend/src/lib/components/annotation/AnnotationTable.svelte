@@ -4,14 +4,16 @@
 	import SearchableSelect from './SearchableSelect.svelte';
 	import FeatsEditor from './FeatsEditor.svelte';
 	import { UPOS_TAGS, DEPREL_TAGS } from '$utils/ud-tagsets';
+	import type { ValidationProfileRead } from '$api/types';
 
 	interface Props {
 		visibleColumns: string[];
 		selectedTokenId?: string | null;
+		validationProfile?: ValidationProfileRead | null;
 		onTokenSelect?: (tokenId: string) => void;
 	}
 
-	let { visibleColumns, selectedTokenId = null, onTokenSelect }: Props = $props();
+	let { visibleColumns, selectedTokenId = null, validationProfile = null, onTokenSelect }: Props = $props();
 
 	const allColumns = ['id_f', 'form', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc'];
 	const editableFields: CellField[] = ['form', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc'];
@@ -172,6 +174,9 @@
 	<FeatsEditor
 		value={featsEditValue}
 		field={featsEditField}
+		allowedFeatures={validationProfile?.allowed_features ?? null}
+		allowedMisc={validationProfile?.allowed_misc ?? null}
+		featureOrder={validationProfile?.feature_order ?? null}
 		onchange={handleFeatsApply}
 		onclose={() => (featsEditToken = null)}
 	/>

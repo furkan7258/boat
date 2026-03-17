@@ -1,16 +1,34 @@
 <script lang="ts">
-	import { FEATURES } from '$utils/ud-tagsets';
+	import { FEATURES, DEFAULT_MISC } from '$utils/ud-tagsets';
 	import Button from '$components/common/Button.svelte';
 
 	interface Props {
 		value: string;
 		field?: 'feats' | 'misc';
+		allowedFeatures?: Record<string, string[]> | null;
+		allowedMisc?: Record<string, string[] | null> | null;
+		featureOrder?: string[] | null;
 		onchange: (value: string) => void;
 		onclose: () => void;
 	}
 
-	let { value, field = 'feats', onchange, onclose }: Props = $props();
+	let { value, field = 'feats', allowedFeatures = null, allowedMisc = null, featureOrder = null, onchange, onclose }: Props = $props();
 	const isMisc = $derived(field === 'misc');
+
+	// Resolve effective presets
+	const effectiveFeatures = $derived(allowedFeatures ?? FEATURES);
+	const effectiveMisc = $derived(allowedMisc ?? DEFAULT_MISC);
+
+	// Feature keys in display order
+	const orderedFeatureKeys = $derived(() => {
+		const allKeys = Object.keys(effectiveFeatures);
+		if (featureOrder && featureOrder.length > 0) {
+			const ordered = featureOrder.filter((k) => k in effectiveFeatures);
+			const remaining = allKeys.filter((k) => !featureOrder.includes(k)).sort();
+			return [...ordered, ...remaining];
+		}
+		return allKeys.sort();
+	});
 
 	// Parse initial FEATS string into a map
 	function parseFeats(raw: string): Map<string, string> {
@@ -24,7 +42,6 @@
 	}
 
 	let feats = $state<Map<string, string>>(new Map());
-	const featureKeys = Object.keys(FEATURES);
 
 	// Parse when value prop changes (e.g., opened for a different cell)
 	$effect(() => {
@@ -56,10 +73,10 @@
 		feats = new Map();
 	}
 
-	// For MISC: add arbitrary key=value
+	// For free-form add (both FEATS and MISC)
 	let newKey = $state('');
 	let newVal = $state('');
-	function addMiscEntry() {
+	function addEntry() {
 		if (newKey.trim() && newVal.trim()) {
 			const next = new Map(feats);
 			next.set(newKey.trim(), newVal.trim());
@@ -69,11 +86,22 @@
 		}
 	}
 
-	function removeMiscEntry(key: string) {
+	function removeEntry(key: string) {
 		const next = new Map(feats);
 		next.delete(key);
 		feats = next;
 	}
+
+	// Compute extra (non-preset) keys currently set on the token
+	const extraFeatureKeys = $derived(
+		[...feats.keys()].filter((k) => !(k in effectiveFeatures)).sort()
+	);
+
+	// For MISC: split entries into preset vs extra
+	const miscPresetKeys = $derived(Object.keys(effectiveMisc));
+	const extraMiscKeys = $derived(
+		[...feats.keys()].filter((k) => !(k in effectiveMisc)).sort()
+	);
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-label="Edit features">
@@ -90,21 +118,61 @@
 
 		<div class="max-h-80 overflow-auto">
 			{#if isMisc}
-				<!-- MISC: free-form key=value entries -->
+				<!-- MISC: preset entries -->
 				<div class="space-y-1.5">
-					{#each [...feats.entries()].sort((a, b) => a[0].localeCompare(b[0])) as [key, val]}
+					{#each miscPresetKeys as key}
+						{@const presetValues = effectiveMisc[key]}
+						{@const currentVal = feats.get(key) ?? ''}
 						<div class="flex items-center gap-1.5">
 							<span class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</span>
-							<input
-								type="text"
-								value={val}
-								onchange={(e) => setFeat(key, (e.target as HTMLInputElement).value)}
-								class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<button onclick={() => removeMiscEntry(key)} class="text-xs text-muted-foreground hover:text-destructive cursor-pointer px-1">&times;</button>
+							{#if presetValues}
+								<!-- Dropdown for keys with predefined values -->
+								<select
+									value={currentVal}
+									onchange={(e) => setFeat(key, (e.target as HTMLSelectElement).value)}
+									class="flex-1 h-7 rounded border border-input bg-background px-1 text-xs focus-visible:ring-2 focus-visible:ring-ring {currentVal ? 'text-foreground' : 'text-muted-foreground'}"
+								>
+									<option value="">--</option>
+									{#each presetValues as val}
+										<option value={val}>{val}</option>
+									{/each}
+								</select>
+							{:else}
+								<!-- Text input for free-form value keys -->
+								<input
+									type="text"
+									value={currentVal}
+									oninput={(e) => setFeat(key, (e.target as HTMLInputElement).value)}
+									placeholder="(free-form)"
+									class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/if}
+							{#if currentVal}
+								<button onclick={() => removeEntry(key)} class="text-xs text-muted-foreground hover:text-destructive cursor-pointer px-1">&times;</button>
+							{/if}
 						</div>
 					{/each}
-					<!-- Add new entry -->
+
+					<!-- Extra (non-preset) entries already on the token -->
+					{#if extraMiscKeys.length > 0}
+						<div class="border-t border-border pt-1.5 mt-1.5">
+							<span class="text-[10px] uppercase tracking-wider text-muted-foreground">Custom</span>
+						</div>
+						{#each extraMiscKeys as key}
+							<div class="flex items-center gap-1.5">
+								<span class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</span>
+								<input
+									type="text"
+									value={feats.get(key) ?? ''}
+									onchange={(e) => setFeat(key, (e.target as HTMLInputElement).value)}
+									class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								<button onclick={() => removeEntry(key)} class="text-xs text-muted-foreground hover:text-destructive cursor-pointer px-1">&times;</button>
+							</div>
+						{/each}
+					{/if}
+
+					<!-- Add new arbitrary entry -->
 					<div class="flex items-center gap-1.5 pt-1 border-t border-border">
 						<input
 							type="text"
@@ -118,13 +186,13 @@
 							placeholder="Value"
 							class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
 						/>
-						<button onclick={addMiscEntry} class="text-xs text-muted-foreground hover:text-foreground cursor-pointer px-1">+</button>
+						<button onclick={addEntry} class="text-xs text-muted-foreground hover:text-foreground cursor-pointer px-1">+</button>
 					</div>
 				</div>
 			{:else}
 				<!-- FEATS: predefined UD features with dropdowns -->
 				<div class="grid grid-cols-2 gap-2">
-					{#each featureKeys as key}
+					{#each orderedFeatureKeys() as key}
 						{@const currentVal = feats.get(key) ?? ''}
 						<div class="flex items-center gap-1.5">
 							<label for="feat-{key}" class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</label>
@@ -135,12 +203,50 @@
 								class="flex-1 h-7 rounded border border-input bg-background px-1 text-xs focus-visible:ring-2 focus-visible:ring-ring {currentVal ? 'text-foreground' : 'text-muted-foreground'}"
 							>
 								<option value="">--</option>
-								{#each FEATURES[key] as val}
+								{#each effectiveFeatures[key] as val}
 									<option value={val}>{val}</option>
 								{/each}
 							</select>
 						</div>
 					{/each}
+				</div>
+
+				<!-- Extra features not in the predefined list -->
+				{#if extraFeatureKeys.length > 0}
+					<div class="border-t border-border pt-2 mt-2">
+						<span class="text-[10px] uppercase tracking-wider text-muted-foreground">Custom features</span>
+						<div class="mt-1.5 space-y-1.5">
+							{#each extraFeatureKeys as key}
+								<div class="flex items-center gap-1.5">
+									<span class="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{key}</span>
+									<input
+										type="text"
+										value={feats.get(key) ?? ''}
+										onchange={(e) => setFeat(key, (e.target as HTMLInputElement).value)}
+										class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+									<button onclick={() => removeEntry(key)} class="text-xs text-muted-foreground hover:text-destructive cursor-pointer px-1">&times;</button>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Free-form add for unregistered features -->
+				<div class="flex items-center gap-1.5 pt-2 mt-2 border-t border-border">
+					<input
+						type="text"
+						bind:value={newKey}
+						placeholder="Feature"
+						class="w-24 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+					<input
+						type="text"
+						bind:value={newVal}
+						placeholder="Value"
+						class="flex-1 h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+					<button onclick={addEntry} class="text-xs text-muted-foreground hover:text-foreground cursor-pointer px-1">+</button>
 				</div>
 			{/if}
 		</div>

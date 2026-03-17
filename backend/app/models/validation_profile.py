@@ -14,6 +14,8 @@ class ValidationProfile(Base, TimestampMixin):
     allowed_upos: Mapped[list | None] = mapped_column(JSON, nullable=True)
     allowed_deprels: Mapped[list | None] = mapped_column(JSON, nullable=True)
     allowed_features: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    allowed_misc: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    feature_order: Mapped[list | None] = mapped_column(JSON, nullable=True)
     custom_rules: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     treebank: Mapped["Treebank | None"] = relationship()  # noqa: F821

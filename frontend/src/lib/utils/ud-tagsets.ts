@@ -37,5 +37,17 @@ export const FEATURES: Record<string, string[]> = {
 	Typo: ['Yes'],
 };
 
+// Default MISC attributes (fallback when no validation profile)
+export const DEFAULT_MISC: Record<string, string[] | null> = {
+	SpaceAfter: ['No'],
+	SpacesAfter: null,
+	Translit: null,
+	LTranslit: null,
+	Gloss: null,
+	CorrectForm: null,
+	CorrectSpaceAfter: ['No'],
+	Lang: null,
+};
+
 export type UposTag = (typeof UPOS_TAGS)[number];
 export type DeprelTag = (typeof DEPREL_TAGS)[number];

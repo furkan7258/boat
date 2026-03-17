@@ -32,13 +32,15 @@
 	import Tooltip from '$components/common/Tooltip.svelte';
 	import KeyboardShortcutsModal from '$components/common/KeyboardShortcutsModal.svelte';
 	import { toast } from '$stores/toast';
-	import type { TreebankRead } from '$api/types';
+	import type { TreebankRead, ValidationProfileRead } from '$api/types';
+	import { getValidationProfile } from '$api/validation';
 
 	const treebankSlug = $derived(decodeURIComponent(page.params.treebank!));
 	const order = $derived(Number(page.params.order!));
 	const offline = $derived($appMode === 'offline');
 
 	let treebank = $state<TreebankRead | null>(null);
+	let validationProfile = $state<ValidationProfileRead | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let maxOrder = $state(0);
@@ -123,6 +125,13 @@
 			]);
 			loadAnnotation(detail);
 			maxOrder = sents.length > 0 ? Math.max(...sents.map((s) => s.order)) : 0;
+
+			// Fetch validation profile (gracefully handle 404)
+			try {
+				validationProfile = await getValidationProfile(tb.id);
+			} catch {
+				validationProfile = null;
+			}
 		} catch (err) {
 			error = err instanceof ApiError ? err.detail : 'Failed to load annotation';
 		} finally {
@@ -345,6 +354,7 @@
 					<AnnotationTable
 						{visibleColumns}
 						{selectedTokenId}
+						{validationProfile}
 						onTokenSelect={handleTokenSelect}
 					/>
 				</div>

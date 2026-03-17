@@ -142,6 +142,19 @@ export interface DiffResponse {
 	tokens: DiffToken[];
 }
 
+// Validation Profile
+export interface ValidationProfileRead {
+	id: number;
+	treebank_id: number | null;
+	allowed_upos: string[] | null;
+	allowed_deprels: string[] | null;
+	allowed_features: Record<string, string[]> | null;
+	allowed_misc: Record<string, string[] | null> | null;
+	feature_order: string[] | null;
+	custom_rules: Record<string, unknown>[] | null;
+	created_at: string;
+}
+
 // Agreement
 export interface AgreementResponse {
 	treebank_id: number;

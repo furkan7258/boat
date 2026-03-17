@@ -10,6 +10,7 @@ from app.models.annotation import Annotation, AnnotationStatus
 from app.models.sentence import Sentence
 from app.models.treebank import Treebank
 from app.models.user import User
+from app.models.validation_profile import ValidationProfile
 from app.models.wordline import WordLine
 from app.schemas.sentence import SentenceBrief
 from app.schemas.treebank import TreebankCreate, TreebankRead, TreebankWithProgress
@@ -68,6 +69,20 @@ async def create_treebank(
         raise HTTPException(status.HTTP_409_CONFLICT, "Treebank title already exists")
     treebank = Treebank(title=body.title, language=body.language)
     db.add(treebank)
+    await db.flush()
+
+    # Auto-create a validation profile with sensible MISC defaults
+    profile = ValidationProfile(
+        treebank_id=treebank.id,
+        allowed_misc={
+            "SpaceAfter": ["No"],
+            "SpacesAfter": None,
+            "Translit": None,
+            "LTranslit": None,
+            "Gloss": None,
+        },
+    )
+    db.add(profile)
     await db.commit()
     await db.refresh(treebank)
     return treebank

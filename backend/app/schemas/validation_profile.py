@@ -8,6 +8,8 @@ class ValidationProfileCreate(BaseModel):
     allowed_upos: list[str] | None = None
     allowed_deprels: list[str] | None = None
     allowed_features: dict[str, list[str]] | None = None
+    allowed_misc: dict[str, list[str] | None] | None = None
+    feature_order: list[str] | None = None
     custom_rules: list[dict] | None = None
 
 
@@ -15,6 +17,8 @@ class ValidationProfileUpdate(BaseModel):
     allowed_upos: list[str] | None = None
     allowed_deprels: list[str] | None = None
     allowed_features: dict[str, list[str]] | None = None
+    allowed_misc: dict[str, list[str] | None] | None = None
+    feature_order: list[str] | None = None
     custom_rules: list[dict] | None = None
 
 
@@ -24,6 +28,8 @@ class ValidationProfileRead(BaseModel):
     allowed_upos: list[str] | None
     allowed_deprels: list[str] | None
     allowed_features: dict[str, list[str]] | None
+    allowed_misc: dict[str, list[str] | None] | None
+    feature_order: list[str] | None
     custom_rules: list[dict] | None
     created_at: datetime
 

@@ -6,3 +6,4 @@ export * as sentenceApi from './sentences';
 export * as annotationApi from './annotations';
 export * as searchApi from './search';
 export * as commentApi from './comments';
+export * as validationApi from './validation';
