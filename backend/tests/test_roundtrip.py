@@ -17,15 +17,15 @@ def test_roundtrip_amgic():
     # Verify sentence 1 metadata
     s1 = sentences[0]
     assert s1["sent_id"] == "1"
-    assert "dialect" in s1["comments"]
-    assert s1["comments"]["dialect"] == "Silliot"
-    assert "text[ell]" in s1["comments"]
-    assert "text[eng]" in s1["comments"]
-    assert s1["comments"]["source"] == "Kostakis 1968:116"
+    assert "dialect" in s1["metadata"]
+    assert s1["metadata"]["dialect"] == "Silliot"
+    assert "text[ell]" in s1["metadata"]
+    assert "text[eng]" in s1["metadata"]
+    assert s1["metadata"]["source"] == "Kostakis 1968:116"
 
     # Verify sentence 2 has empty text[eng]
     s2 = sentences[1]
-    assert s2["comments"]["text[eng]"] == ""
+    assert s2["metadata"]["text[eng]"] == ""
 
     # Verify language contact markers in MISC are preserved
     # Token 17 in sentence 1: LC=Yes|MorphSynC=FrGrM|...
@@ -38,14 +38,14 @@ def test_roundtrip_amgic():
     for sent in sentences:
         wordlines = []
         for key, val in sent.items():
-            if key in ("sent_id", "text", "comments"):
+            if key in ("sent_id", "text", "metadata"):
                 continue
             wordlines.append({"id_f": key, **val})
         export_data.append(
             {
                 "sent_id": sent["sent_id"],
                 "text": sent["text"],
-                "comments": sent.get("comments"),
+                "metadata": sent.get("metadata"),
                 "wordlines": wordlines,
             }
         )
@@ -58,20 +58,20 @@ def test_roundtrip_amgic():
 
     # Verify round-trip: same number of tokens per sentence
     for orig, reparse in zip(sentences, reparsed, strict=True):
-        orig_tokens = {k for k in orig if k not in ("sent_id", "text", "comments")}
-        reparse_tokens = {k for k in reparse if k not in ("sent_id", "text", "comments")}
+        orig_tokens = {k for k in orig if k not in ("sent_id", "text", "metadata")}
+        reparse_tokens = {k for k in reparse if k not in ("sent_id", "text", "metadata")}
         assert orig_tokens == reparse_tokens, f"Token mismatch in {orig['sent_id']}"
 
     # Verify round-trip: comments preserved
     for orig, reparse in zip(sentences, reparsed, strict=True):
-        assert orig.get("comments", {}) == reparse.get("comments", {}), (
+        assert orig.get("metadata", {}) == reparse.get("metadata", {}), (
             f"Comment mismatch in {orig['sent_id']}"
         )
 
     # Verify round-trip: field values preserved
     for orig, reparse in zip(sentences, reparsed, strict=True):
         for tok_id in orig:
-            if tok_id in ("sent_id", "text", "comments"):
+            if tok_id in ("sent_id", "text", "metadata"):
                 continue
             for field in (
                 "form",

@@ -22,6 +22,58 @@
 	const pageSize = 20;
 	let allSentences = $state<SentenceBrief[]>([]);
 
+	// Filtering
+	let activeFilters = $state<Record<string, string>>({});
+	let showFilters = $state(false);
+
+	// Auto-detect filterable metadata keys (keys with <= 20 distinct values)
+	const filterableKeys = $derived(() => {
+		const keyCounts = new Map<string, Map<string, number>>();
+		for (const sent of allSentences) {
+			if (!sent.metadata) continue;
+			for (const [key, val] of Object.entries(sent.metadata)) {
+				if (!keyCounts.has(key)) keyCounts.set(key, new Map());
+				const valMap = keyCounts.get(key)!;
+				valMap.set(val, (valMap.get(val) ?? 0) + 1);
+			}
+		}
+		const result: { key: string; values: { value: string; count: number }[] }[] = [];
+		for (const [key, valMap] of keyCounts) {
+			if (valMap.size >= 2 && valMap.size <= 20) {
+				const values = [...valMap.entries()]
+					.map(([value, count]) => ({ value, count }))
+					.sort((a, b) => b.count - a.count);
+				result.push({ key, values });
+			}
+		}
+		return result.sort((a, b) => a.key.localeCompare(b.key));
+	});
+
+	const filteredSentences = $derived(() => {
+		const keys = Object.entries(activeFilters).filter(([, v]) => v !== '');
+		if (keys.length === 0) return allSentences;
+		return allSentences.filter((sent) => {
+			if (!sent.metadata) return false;
+			return keys.every(([key, val]) => sent.metadata?.[key] === val);
+		});
+	});
+
+	const paginatedSentences = $derived(
+		filteredSentences().slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+	);
+
+	const hasActiveFilters = $derived(Object.values(activeFilters).some((v) => v !== ''));
+
+	function clearFilters() {
+		activeFilters = {};
+		currentPage = 0;
+	}
+
+	function setFilter(key: string, value: string) {
+		activeFilters = { ...activeFilters, [key]: value };
+		currentPage = 0;
+	}
+
 	// Add sentence
 	let showAdd = $state(false);
 	let newSentId = $state('');
@@ -37,10 +89,6 @@
 	// Delete
 	let showDelete = $state(false);
 	let deleteTarget = $state<SentenceBrief | null>(null);
-
-	const paginatedSentences = $derived(
-		allSentences.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-	);
 
 	onMount(loadData);
 
@@ -158,6 +206,36 @@
 				</div>
 			</EmptyState>
 		{:else}
+			<!-- Filter bar -->
+			{#if filterableKeys().length > 0}
+				<div class="mb-4 flex flex-wrap items-center gap-3">
+					{#each filterableKeys() as { key, values }}
+						<div class="flex items-center gap-1.5">
+							<label for="filter-{key}" class="text-xs font-medium text-muted-foreground">{key}</label>
+							<select
+								id="filter-{key}"
+								value={activeFilters[key] ?? ''}
+								onchange={(e) => setFilter(key, (e.target as HTMLSelectElement).value)}
+								class="h-7 rounded border border-input bg-background px-2 text-xs focus-visible:ring-2 focus-visible:ring-ring {activeFilters[key] ? 'text-foreground font-medium' : 'text-muted-foreground'}"
+							>
+								<option value="">All</option>
+								{#each values as { value, count }}
+									<option value={value}>{value} ({count})</option>
+								{/each}
+							</select>
+						</div>
+					{/each}
+					{#if hasActiveFilters}
+						<button onclick={clearFilters} class="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline">
+							Clear filters
+						</button>
+						<span class="text-xs text-muted-foreground">
+							{filteredSentences().length} of {allSentences.length} sentences
+						</span>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="overflow-hidden rounded-lg border border-border">
 				<table class="w-full text-sm">
 					<thead class="bg-muted text-left">
@@ -205,7 +283,7 @@
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={(currentPage + 1) * pageSize >= allSentences.length}
+					disabled={(currentPage + 1) * pageSize >= filteredSentences().length}
 					onclick={() => goPage(currentPage + 1)}
 				>
 					Next

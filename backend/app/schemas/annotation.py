@@ -36,7 +36,7 @@ class AnnotationDetail(AnnotationRead):
     annotator_username: str | None = None
     sentence_sent_id: str | None = None
     sentence_text: str | None = None
-    sentence_comments: dict | None = None
+    sentence_metadata: dict | None = None
     treebank_title: str | None = None
     treebank_id: int | None = None
     sentence_order: int | None = None

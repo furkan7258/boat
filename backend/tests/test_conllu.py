@@ -51,8 +51,8 @@ def test_parse_comments():
         "\n"
     )
     sentences = parse_text(text)
-    assert "comments" in sentences[0]
-    assert sentences[0]["comments"]["custom_key"] == "custom_value"
+    assert "metadata" in sentences[0]
+    assert sentences[0]["metadata"]["custom_key"] == "custom_value"
 
 
 def test_parse_multiword_token():
@@ -88,7 +88,7 @@ def test_export_conllu():
         {
             "sent_id": "test-1",
             "text": "The cat.",
-            "comments": {"source": "test"},
+            "metadata": {"source": "test"},
             "wordlines": [
                 {
                     "id_f": "1",

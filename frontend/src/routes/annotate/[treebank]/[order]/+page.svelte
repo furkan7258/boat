@@ -12,7 +12,7 @@
 		annotationId,
 		sentId,
 		sentenceText,
-		sentenceComments,
+		sentenceMetadata,
 		status as annotationStatus,
 		notes,
 		isDirty,
@@ -309,9 +309,9 @@
 		<!-- Sentence text -->
 		<div class="border-b border-border bg-muted/30 px-4 py-3">
 			<p class="text-sm">{$sentenceText}</p>
-			{#if $sentenceComments}
+			{#if $sentenceMetadata}
 				<div class="mt-1 flex flex-wrap gap-2">
-					{#each Object.entries($sentenceComments) as [key, val]}
+					{#each Object.entries($sentenceMetadata) as [key, val]}
 						<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 							{key}: {val}
 						</span>

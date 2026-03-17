@@ -175,14 +175,14 @@ async def upload_conllu(
     for i, sent_data in enumerate(sentences, start=current_max + 1):
         sent_id = sent_data.get("sent_id", f"{treebank.title}-{i}")
         text = sent_data.get("text", "")
-        comments = sent_data.get("comments")
+        metadata = sent_data.get("metadata")
 
         sentence = Sentence(
             order=i,
             treebank_id=treebank_id,
             sent_id=sent_id,
             text=text,
-            comments=comments,
+            metadata_=metadata,
         )
         db.add(sentence)
         await db.flush()
@@ -199,7 +199,7 @@ async def upload_conllu(
 
         # Create wordlines from parsed data
         for word_id, fields in sent_data.items():
-            if word_id in ("sent_id", "text", "comments"):
+            if word_id in ("sent_id", "text", "metadata"):
                 continue
             wordline = WordLine(
                 annotation_id=annotation.id,
@@ -253,7 +253,7 @@ async def export_treebank_conllu(
                 {
                     "sent_id": sent.sent_id,
                     "text": sent.text,
-                    "comments": sent.comments,
+                    "metadata": sent.metadata_,
                     "wordlines": [
                         {
                             "id_f": wl.id_f,

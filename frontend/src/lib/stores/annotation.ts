@@ -47,7 +47,7 @@ export const annotationId = writable<number | null>(null);
 export const sentenceId = writable<number | null>(null);
 export const sentId = writable('');
 export const sentenceText = writable('');
-export const sentenceComments = writable<Record<string, string> | null>(null);
+export const sentenceMetadata = writable<Record<string, string> | null>(null);
 export const status = writable(0);
 export const notes = writable('');
 export const isGold = writable(false);
@@ -78,7 +78,7 @@ export function loadAnnotation(detail: AnnotationDetail) {
 	sentenceId.set(detail.sentence_id);
 	sentId.set(detail.sentence_sent_id ?? '');
 	sentenceText.set(detail.sentence_text ?? '');
-	sentenceComments.set(detail.sentence_comments);
+	sentenceMetadata.set(detail.sentence_metadata);
 	status.set(detail.status);
 	notes.set(detail.notes ?? '');
 	isGold.set(detail.is_gold);

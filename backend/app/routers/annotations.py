@@ -289,7 +289,7 @@ def _build_annotation_detail(a: Annotation) -> AnnotationDetail:
         annotator_username=a.annotator.username,
         sentence_sent_id=a.sentence.sent_id,
         sentence_text=a.sentence.text,
-        sentence_comments=a.sentence.comments,
+        sentence_metadata=a.sentence.metadata_,
         treebank_title=a.sentence.treebank.title,
         treebank_id=a.sentence.treebank.id,
         sentence_order=a.sentence.order,

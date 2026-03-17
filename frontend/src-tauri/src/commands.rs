@@ -342,7 +342,7 @@ fn sentence_to_annotation_detail(sent: &conllu::Sentence, treebank_title: &str) 
         "annotator_username": "local",
         "sentence_sent_id": sent.sent_id,
         "sentence_text": sent.text,
-        "sentence_comments": if sent.comments.is_empty() { Value::Null } else { json!(sent.comments) },
+        "sentence_metadata": if sent.comments.is_empty() { Value::Null } else { json!(sent.comments) },
         "treebank_title": treebank_title,
         "treebank_id": 1,
         "sentence_order": sent.order

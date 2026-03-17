@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SentenceCreate(BaseModel):
     sent_id: str
     text: str
-    comments: dict | None = None
+    metadata: dict | None = None
 
 
 class SentenceRead(BaseModel):
@@ -15,7 +15,7 @@ class SentenceRead(BaseModel):
     treebank_id: int
     sent_id: str
     text: str
-    comments: dict | None
+    metadata: dict | None = Field(default=None, validation_alias="metadata_")
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -26,5 +26,6 @@ class SentenceBrief(BaseModel):
     order: int
     sent_id: str
     text: str
+    metadata: dict | None = Field(default=None, validation_alias="metadata_")
 
     model_config = {"from_attributes": True}

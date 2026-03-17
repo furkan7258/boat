@@ -28,7 +28,7 @@ def parse_text(text: str) -> list[dict]:
     """Parse CoNLL-U text into a list of sentence dicts.
 
     Each sentence dict has keys:
-        sent_id, text, comments (optional dict),
+        sent_id, text, metadata (optional dict),
         and word-id keys ("1", "2", "1-2", …) mapping to field dicts.
     """
     raw_sentences = _SENTENCE_RE.findall(text)
@@ -44,7 +44,7 @@ def parse_text(text: str) -> list[dict]:
                     if key in ("sent_id", "text"):
                         sentence[key] = value
                     else:
-                        sentence.setdefault("comments", {})[key] = value
+                        sentence.setdefault("metadata", {})[key] = value
             else:
                 m = _WORD_RE.match(line)
                 if m:
@@ -80,7 +80,7 @@ def export_conllu(sentences: list[dict]) -> str:
         {
             "sent_id": str,
             "text": str,
-            "comments": {key: value, ...} | None,
+            "metadata": {key: value, ...} | None,
             "wordlines": [{"id_f": ..., "form": ..., ...}, ...]
         }
     """
@@ -89,8 +89,8 @@ def export_conllu(sentences: list[dict]) -> str:
     for sent in sentences:
         output.append(f"# sent_id = {sent['sent_id']}")
         output.append(f"# text = {sent['text']}")
-        if sent.get("comments"):
-            for key, value in sent["comments"].items():
+        if sent.get("metadata"):
+            for key, value in sent["metadata"].items():
                 output.append(f"# {key} = {value}")
 
         sorted_wls = sort_wordlines_by_id(sent["wordlines"])

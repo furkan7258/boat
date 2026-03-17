@@ -58,7 +58,7 @@ def upgrade() -> None:
         ),
         sa.Column("sent_id", sa.String(30), nullable=False, index=True),
         sa.Column("text", sa.Text, nullable=False),
-        sa.Column("comments", sa.JSON, nullable=True),
+        sa.Column("metadata", sa.JSON, nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

@@ -53,7 +53,7 @@ async def create_sentence(
         treebank_id=treebank_id,
         sent_id=body.sent_id or f"{treebank.title}-{next_order}",
         text=body.text,
-        comments=body.comments,
+        metadata_=body.metadata,
     )
     db.add(sentence)
     await db.flush()

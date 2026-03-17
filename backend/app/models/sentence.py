@@ -13,7 +13,7 @@ class Sentence(Base, TimestampMixin):
     treebank_id: Mapped[int] = mapped_column(ForeignKey("treebanks.id", ondelete="CASCADE"))
     sent_id: Mapped[str] = mapped_column(String(30), index=True)
     text: Mapped[str] = mapped_column(Text)
-    comments: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
 
     treebank: Mapped["Treebank"] = relationship(back_populates="sentences")  # noqa: F821
     annotations: Mapped[list["Annotation"]] = relationship(  # noqa: F821

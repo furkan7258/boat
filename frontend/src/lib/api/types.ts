@@ -40,11 +40,12 @@ export interface SentenceBrief {
 	order: number;
 	sent_id: string;
 	text: string;
+	metadata: Record<string, string> | null;
 }
 
 export interface SentenceRead extends SentenceBrief {
 	treebank_id: number;
-	comments: Record<string, string> | null;
+	metadata: Record<string, string> | null;
 	created_at: string;
 }
 
@@ -83,7 +84,7 @@ export interface AnnotationDetail extends AnnotationRead {
 	annotator_username: string | null;
 	sentence_sent_id: string | null;
 	sentence_text: string | null;
-	sentence_comments: Record<string, string> | null;
+	sentence_metadata: Record<string, string> | null;
 	treebank_title: string | null;
 	treebank_id: number | null;
 	sentence_order: number | null;
