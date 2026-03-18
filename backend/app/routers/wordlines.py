@@ -55,20 +55,25 @@ async def batch_update_wordlines(
     template = template_result.scalar_one_or_none()
 
     if template and template.wordlines:
+
         def _wl_fields(wl):
             return (
-                wl.id_f, wl.form, wl.lemma, wl.upos, wl.xpos,
-                wl.feats, wl.head, wl.deprel, wl.deps, wl.misc,
+                wl.id_f,
+                wl.form,
+                wl.lemma,
+                wl.upos,
+                wl.xpos,
+                wl.feats,
+                wl.head,
+                wl.deprel,
+                wl.deps,
+                wl.misc,
             )
 
         template_fields = [
-            _wl_fields(wl)
-            for wl in sorted(template.wordlines, key=lambda w: w.id_f)
+            _wl_fields(wl) for wl in sorted(template.wordlines, key=lambda w: w.id_f)
         ]
-        new_fields = [
-            _wl_fields(wl)
-            for wl in sorted(new_wordlines, key=lambda w: w.id_f)
-        ]
+        new_fields = [_wl_fields(wl) for wl in sorted(new_wordlines, key=lambda w: w.id_f)]
         annotation.status = (
             AnnotationStatus.COMPLETE if new_fields != template_fields else AnnotationStatus.NEW
         )
