@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         if not v or v == "change-me-in-production":
             raise ValueError(
                 "SECRET_KEY must be set to a strong random value. "
-                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
             )
         return v
 
