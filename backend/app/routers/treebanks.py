@@ -157,7 +157,14 @@ async def upload_conllu(
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
 
-    content = (await file.read()).decode("utf-8").replace("\r\n", "\n")
+    max_size = 10 * 1024 * 1024  # 10 MB
+    raw = await file.read()
+    if len(raw) > max_size:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"File too large ({len(raw) / 1024 / 1024:.1f} MB). Maximum is 10 MB.",
+        )
+    content = raw.decode("utf-8").replace("\r\n", "\n")
     if not content.endswith("\n"):
         content += "\n"
     if not validate_uploaded_text(content):

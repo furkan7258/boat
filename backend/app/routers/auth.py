@@ -63,8 +63,10 @@ async def update_me(
     db: AsyncSession = Depends(get_db),
 ):
     update_data = body.model_dump(exclude_unset=True)
+    allowed_fields = {"first_name", "last_name", "email", "preferences"}
     for field, value in update_data.items():
-        setattr(current_user, field, value)
+        if field in allowed_fields:
+            setattr(current_user, field, value)
     await db.commit()
     await db.refresh(current_user)
     return current_user
