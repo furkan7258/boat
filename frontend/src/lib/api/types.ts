@@ -131,6 +131,42 @@ export interface SearchResponse {
 	total: number;
 }
 
+// Structural Search
+export interface NodeConstraint {
+	upos?: string[];
+	feats?: Record<string, string[]>;
+	form?: string;
+	lemma?: string;
+}
+
+export interface RelationConstraint extends NodeConstraint {
+	deprel?: string[];
+}
+
+export interface StructuralQuery {
+	target: NodeConstraint;
+	head_constraint?: RelationConstraint;
+	dependent_constraints?: RelationConstraint[];
+	negated_dependents?: RelationConstraint[];
+	treebank_id?: number;
+	limit?: number;
+	offset?: number;
+}
+
+export interface StructuralMatch {
+	sentence_id: number;
+	sent_id: string;
+	text: string;
+	treebank_id: number;
+	treebank_title: string;
+	matched_token_ids: string[];
+}
+
+export interface StructuralSearchResponse {
+	results: StructuralMatch[];
+	total: number;
+}
+
 // Comment
 export interface CommentRead {
 	id: number;

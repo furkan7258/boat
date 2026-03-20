@@ -10,7 +10,14 @@ from app.models.sentence import Sentence
 from app.models.treebank import Treebank
 from app.models.user import User
 from app.models.wordline import WordLine
-from app.schemas.search import SearchResponse, SearchResult
+from app.schemas.search import (
+    SearchResponse,
+    SearchResult,
+    StructuralMatch,
+    StructuralQuery,
+    StructuralSearchResponse,
+)
+from app.services.structural_search import match_structural
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -112,3 +119,87 @@ async def search(
             for wl in wordlines
         ],
     )
+
+
+@router.post("/structural", response_model=StructuralSearchResponse)
+async def structural_search(
+    query: StructuralQuery,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    """Search for tokens matching structural (tree-pattern) constraints.
+
+    The search operates on template annotations and returns sentences that
+    contain at least one token matching all specified constraints (target
+    properties, head constraints, dependent constraints, negated dependents).
+
+    Pagination is by sentence, not by individual token match.
+    """
+    # Build base query: sentences with their template annotation wordlines
+    stmt = (
+        select(Sentence)
+        .join(Annotation, Annotation.sentence_id == Sentence.id)
+        .where(Annotation.is_template.is_(True))
+        .options(
+            selectinload(Sentence.treebank),
+            selectinload(Sentence.annotations.and_(Annotation.is_template.is_(True)))
+            .selectinload(Annotation.wordlines),
+        )
+    )
+
+    if query.treebank_id is not None:
+        stmt = stmt.where(Sentence.treebank_id == query.treebank_id)
+
+    # Order deterministically for stable pagination
+    stmt = stmt.order_by(Sentence.treebank_id, Sentence.order)
+
+    result = await db.execute(stmt)
+    sentences = result.scalars().unique().all()
+
+    # Convert the query model to a plain dict for the matcher
+    query_dict = query.model_dump(exclude={"treebank_id", "limit", "offset"})
+
+    # Run structural matching on each sentence
+    matches: list[StructuralMatch] = []
+    for sent in sentences:
+        # Find the template annotation
+        template = next(
+            (a for a in sent.annotations if a.is_template), None
+        )
+        if template is None or not template.wordlines:
+            continue
+
+        # Convert ORM wordlines to dicts
+        wl_dicts = [
+            {
+                "id_f": wl.id_f,
+                "form": wl.form,
+                "lemma": wl.lemma,
+                "upos": wl.upos,
+                "xpos": wl.xpos,
+                "feats": wl.feats,
+                "head": wl.head,
+                "deprel": wl.deprel,
+                "deps": wl.deps,
+                "misc": wl.misc,
+            }
+            for wl in template.wordlines
+        ]
+
+        matched_tokens = match_structural(query_dict, wl_dicts)
+        if matched_tokens:
+            matches.append(
+                StructuralMatch(
+                    sentence_id=sent.id,
+                    sent_id=sent.sent_id,
+                    text=sent.text,
+                    treebank_id=sent.treebank_id,
+                    treebank_title=sent.treebank.title,
+                    matched_token_ids=[t["id_f"] for t in matched_tokens],
+                )
+            )
+
+    total = len(matches)
+    paginated = matches[query.offset : query.offset + query.limit]
+
+    return StructuralSearchResponse(results=paginated, total=total)
