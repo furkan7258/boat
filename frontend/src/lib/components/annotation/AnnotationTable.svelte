@@ -53,6 +53,9 @@
 	// Set of valid token IDs for HEAD validation
 	const validIds = $derived(new Set($cells.map((c) => c.id_f)));
 
+	// Enable native browser virtualization for long sentences (100+ tokens)
+	const isLongSentence = $derived($cells.length > 100);
+
 	// Inline validation
 	function cellError(cell: typeof $cells[0], col: string): string | null {
 		if (col === 'upos' && cell.upos !== '_' && !UPOS_TAGS.includes(cell.upos as any)) {
@@ -70,8 +73,8 @@
 	}
 </script>
 
-<div class="overflow-x-auto">
-	<table class="w-full border-collapse text-sm">
+<div class="overflow-x-auto" class:annotation-table-scroll={isLongSentence}>
+	<table class="w-full border-collapse text-sm" role="grid" aria-label="Annotation table">
 		<thead>
 			<tr class="bg-muted">
 				{#each columns as col}
@@ -89,6 +92,7 @@
 				{@const isEven = idx % 2 === 0}
 				<tr
 					class="border-t border-border hover:bg-muted/30 {isMultiword ? 'opacity-70' : ''} {isSelected ? 'bg-blue-50 dark:bg-blue-950/30' : isEven ? 'bg-muted/20' : ''}"
+					style={isLongSentence ? 'content-visibility: auto; contain-intrinsic-size: auto 32px;' : ''}
 					onclick={() => onTokenSelect?.(cell.id_f)}
 				>
 					{#each columns as col}
@@ -136,6 +140,7 @@
 								field={col}
 								tokenId={cell.id_f}
 								onchange={handleCellChange}
+								hasError={!!error}
 							/>
 						{:else}
 							<td class="border-r border-border px-2 py-0.5 text-xs">{cell[col as keyof typeof cell]}</td>
@@ -143,7 +148,7 @@
 						<!-- Validation tooltip -->
 						{#if error && col !== 'upos'}
 							<td class="p-0 w-0 relative">
-								<span class="absolute -left-4 top-0 text-destructive text-[10px]" title={error}>!</span>
+								<span class="absolute -left-4 top-0 text-destructive text-[10px]" title={error} role="alert" aria-label="Validation error">!</span>
 							</td>
 						{/if}
 					{/each}
@@ -168,6 +173,13 @@
 		</tbody>
 	</table>
 </div>
+
+<style>
+	.annotation-table-scroll {
+		max-height: 70vh;
+		overflow-y: auto;
+	}
+</style>
 
 <!-- FEATS/MISC Editor Modal -->
 {#if featsEditToken}

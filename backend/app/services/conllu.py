@@ -73,6 +73,23 @@ def sort_wordlines_by_id(wordlines: list[dict]) -> list[dict]:
     return result
 
 
+def _format_sentence_block(sent: dict) -> str:
+    """Format a single sentence dict as a CoNLL-U block (with trailing blank line)."""
+    lines: list[str] = []
+    lines.append(f"# sent_id = {sent['sent_id']}")
+    lines.append(f"# text = {sent['text']}")
+    if sent.get("metadata"):
+        for key, value in sent["metadata"].items():
+            lines.append(f"# {key} = {value}")
+
+    sorted_wls = sort_wordlines_by_id(sent["wordlines"])
+    for wl in sorted_wls:
+        fields = "\t".join(wl[f] for f in ("id_f", *FIELDS))
+        lines.append(fields)
+    lines.append("")  # blank line between sentences
+    return "\n".join(lines) + "\n"
+
+
 def export_conllu(sentences: list[dict]) -> str:
     """Export a list of sentence dicts (with nested wordlines) to CoNLL-U text.
 
@@ -84,19 +101,6 @@ def export_conllu(sentences: list[dict]) -> str:
             "wordlines": [{"id_f": ..., "form": ..., ...}, ...]
         }
     """
-    output: list[str] = []
-
-    for sent in sentences:
-        output.append(f"# sent_id = {sent['sent_id']}")
-        output.append(f"# text = {sent['text']}")
-        if sent.get("metadata"):
-            for key, value in sent["metadata"].items():
-                output.append(f"# {key} = {value}")
-
-        sorted_wls = sort_wordlines_by_id(sent["wordlines"])
-        for wl in sorted_wls:
-            fields = "\t".join(wl[f] for f in ("id_f", *FIELDS))
-            output.append(fields)
-        output.append("")  # blank line between sentences
-
-    return "\n".join(output) + "\n" if output else ""
+    if not sentences:
+        return ""
+    return "".join(_format_sentence_block(sent) for sent in sentences)

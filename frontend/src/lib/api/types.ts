@@ -112,6 +112,11 @@ export interface SearchResult {
 	annotator_username: string;
 }
 
+export interface SearchResponse {
+	results: SearchResult[];
+	total: number;
+}
+
 // Comment
 export interface CommentRead {
 	id: number;

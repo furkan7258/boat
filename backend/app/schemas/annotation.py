@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
+from app.models.annotation import AnnotationStatus
 from app.schemas.wordline import WordLineRead
 
 
@@ -11,11 +12,28 @@ class AnnotationCreate(BaseModel):
     status: int = 0
     is_template: bool = False
 
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: int) -> int:
+        valid = {s.value for s in AnnotationStatus}
+        if v not in valid:
+            raise ValueError(f"status must be one of {sorted(valid)}")
+        return v
+
 
 class AnnotationUpdate(BaseModel):
     notes: str | None = None
     status: int | None = None
     is_gold: bool | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: int | None) -> int | None:
+        if v is not None:
+            valid = {s.value for s in AnnotationStatus}
+            if v not in valid:
+                raise ValueError(f"status must be one of {sorted(valid)}")
+        return v
 
 
 class AnnotationRead(BaseModel):

@@ -6,9 +6,11 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.annotation import Annotation, AnnotationStatus
+from app.models.sentence import Sentence
 from app.models.user import User
 from app.models.wordline import WordLine
 from app.schemas.wordline import WordLineBatchUpdate, WordLineRead
+from app.services.agreement import invalidate_agreement_cache
 
 router = APIRouter(prefix="/wordlines", tags=["wordlines"])
 
@@ -81,6 +83,14 @@ async def batch_update_wordlines(
         annotation.status = AnnotationStatus.COMPLETE
 
     await db.commit()
+
+    # Invalidate agreement cache for the affected treebank
+    sentence_result = await db.execute(
+        select(Sentence.treebank_id).where(Sentence.id == annotation.sentence_id)
+    )
+    treebank_id = sentence_result.scalar_one_or_none()
+    if treebank_id is not None:
+        invalidate_agreement_cache(treebank_id)
 
     # Refresh to get IDs
     for wl in new_wordlines:

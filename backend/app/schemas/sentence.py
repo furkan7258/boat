@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 
 
 class SentenceCreate(BaseModel):
-    sent_id: str
-    text: str
+    sent_id: str = Field(min_length=1, max_length=30)
+    text: str = Field(min_length=1)
     metadata: dict | None = None
 
 

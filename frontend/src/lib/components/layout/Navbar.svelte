@@ -85,9 +85,9 @@
 		</div>
 		<div class="flex items-center gap-4 text-sm">
 			{#if $appMode === 'offline'}
-				<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">Offline</span>
+				<span class="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Offline</span>
 			{:else if $appMode === 'connected'}
-				<span class="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary" title={$serverUrl}>Connected</span>
+				<span class="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900 dark:text-green-200" title={$serverUrl}>Connected</span>
 			{/if}
 			<button
 				onclick={cycleTheme}

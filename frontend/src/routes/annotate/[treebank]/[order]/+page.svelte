@@ -17,7 +17,10 @@
 		isDirty,
 		isSaving,
 		getCellsForSave,
-		updateCell
+		updateCell,
+		saveDraft,
+		loadDraft,
+		clearDraft
 	} from '$stores/annotation';
 	import { currentColumns, graphPreference } from '$stores/preferences';
 	import { appMode } from '$stores/mode';
@@ -30,6 +33,7 @@
 	import Breadcrumb from '$components/layout/Breadcrumb.svelte';
 	import Tooltip from '$components/common/Tooltip.svelte';
 	import KeyboardShortcutsModal from '$components/common/KeyboardShortcutsModal.svelte';
+	import ErrorState from '$components/common/ErrorState.svelte';
 	import { toast } from '$stores/toast';
 	import type { TreebankRead, ValidationProfileRead } from '$api/types';
 	import { getValidationProfile } from '$api/validation';
@@ -47,6 +51,9 @@
 	let showComments = $state(false);
 	let showGraph = $state(true);
 
+	// Token count for auto-hiding graph on long sentences
+	const tokenCount = $derived($cells.filter((c) => !c.id_f.includes('-') && !c.id_f.includes('.')).length);
+
 	// Click-to-set-HEAD mode
 	let selectedTokenId = $state<string | null>(null);
 	let headSelectionMode = $state(false);
@@ -57,7 +64,9 @@
 
 	onMount(async () => {
 		visibleColumns = $currentColumns;
-		showGraph = $graphPreference !== 0;
+		// Restore graph visibility from localStorage, falling back to user preference
+		const storedGraphPref = localStorage.getItem('boat-show-graph');
+		showGraph = storedGraphPref !== null ? storedGraphPref === '1' : $graphPreference !== 0;
 
 		// First-use hints
 		const dismissed = localStorage.getItem('boat-hints-dismissed');
@@ -69,7 +78,7 @@
 			{ key: 'z', ctrl: true, handler: undo, description: 'Undo' },
 			{ key: 'y', ctrl: true, handler: redo, description: 'Redo' },
 			{ key: 'd', alt: true, handler: () => (showComments = !showComments), description: 'Toggle discussion' },
-			{ key: 'g', alt: true, handler: () => (showGraph = !showGraph), description: 'Toggle graph' },
+			{ key: 'g', alt: true, handler: toggleGraph, description: 'Toggle graph' },
 			{ key: 'h', alt: true, handler: () => (headSelectionMode = !headSelectionMode), description: 'Toggle HEAD selection mode' },
 			{ key: 'Escape', handler: () => { headSelectionMode = false; }, description: 'Exit HEAD selection mode' },
 			{ key: '?', shift: true, handler: () => (showShortcuts = !showShortcuts), description: 'Show keyboard shortcuts' },
@@ -100,6 +109,25 @@
 		}
 	});
 
+	// Auto-hide graph for sentences with >= 50 tokens (on initial load)
+	let graphAutoHideApplied = $state(false);
+	$effect(() => {
+		if (!loading && tokenCount > 0 && !graphAutoHideApplied) {
+			graphAutoHideApplied = true;
+			// Only auto-hide if user hasn't explicitly set a localStorage preference
+			const storedPref = localStorage.getItem('boat-show-graph');
+			if (storedPref === null && tokenCount >= 50) {
+				showGraph = false;
+			}
+		}
+	});
+
+	// Persist graph visibility preference to localStorage on manual toggle
+	function toggleGraph() {
+		showGraph = !showGraph;
+		localStorage.setItem('boat-show-graph', showGraph ? '1' : '0');
+	}
+
 	// Warn before closing tab with unsaved changes
 	$effect(() => {
 		const dirty = $isDirty;
@@ -112,9 +140,21 @@
 		return () => window.removeEventListener('beforeunload', beforeUnload);
 	});
 
+	// Auto-save draft to localStorage when dirty (debounced 2s)
+	$effect(() => {
+		const dirty = $isDirty;
+		const id = $annotationId;
+		// Read cells to track changes
+		$cells;
+		if (!dirty || !id) return;
+		const timeout = setTimeout(() => saveDraft(id), 2000);
+		return () => clearTimeout(timeout);
+	});
+
 	async function loadPage() {
 		loading = true;
 		error = '';
+		graphAutoHideApplied = false;
 		try {
 			const tb = await getTreebankByTitle(treebankSlug);
 			treebank = tb;
@@ -124,6 +164,13 @@
 			]);
 			loadAnnotation(detail);
 			maxOrder = sents.length > 0 ? Math.max(...sents.map((s) => s.order)) : 0;
+
+			// Restore draft if available
+			const draft = loadDraft(detail.id);
+			if (draft) {
+				cells.set(draft);
+				toast.info('Unsaved changes recovered');
+			}
 
 			// Fetch validation profile (gracefully handle 404)
 			try {
@@ -139,6 +186,7 @@
 	}
 
 	async function save() {
+		if ($isSaving) return;
 		if (!$annotationId || !treebank) return;
 		isSaving.set(true);
 		try {
@@ -155,6 +203,7 @@
 
 			const detail = await getAnnotationByPosition(treebank.id, order);
 			loadAnnotation(detail);
+			clearDraft(detail.id);
 			toast.success('Annotation saved');
 		} catch (err) {
 			const msg = err instanceof ApiError ? err.detail : 'Failed to save';
@@ -179,6 +228,7 @@
 	}
 
 	async function goPrev() {
+		if (loading) return;
 		if (order <= 1) return;
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
 		await goto(`/annotate/${treebankSlug}/${order - 1}`);
@@ -186,6 +236,7 @@
 	}
 
 	async function goNext() {
+		if (loading) return;
 		if (order >= maxOrder) return;
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
 		await goto(`/annotate/${treebankSlug}/${order + 1}`);
@@ -233,7 +284,7 @@
 			{/if}
 			<Tooltip text="Toggle graph (Alt+G)">
 				<button
-					onclick={() => (showGraph = !showGraph)}
+					onclick={toggleGraph}
 					class="text-muted-foreground hover:text-foreground cursor-pointer {showGraph ? 'text-primary' : ''}"
 				>Graph</button>
 			</Tooltip>
@@ -281,8 +332,8 @@
 			<div class="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
 		</div>
 	{:else if error}
-		<div class="flex flex-1 items-center justify-center">
-			<div class="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>
+		<div class="flex flex-1 items-center justify-center p-8">
+			<ErrorState message={error} onRetry={loadPage} />
 		</div>
 	{:else}
 		{#if showHints}
@@ -327,6 +378,7 @@
 						oncolumnschange={handleColumnsChange}
 						hasPrev={order > 1}
 						hasNext={order < maxOrder}
+						{loading}
 					/>
 				</div>
 
@@ -340,6 +392,14 @@
 								{headSelectionMode}
 								onTokenClick={handleGraphTokenClick}
 							/>
+						</div>
+					{:else if tokenCount >= 50}
+						<div class="mb-2 flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2">
+							<span class="text-xs text-muted-foreground">Graph hidden ({tokenCount} tokens).</span>
+							<button
+								onclick={toggleGraph}
+								class="text-xs text-primary hover:underline cursor-pointer"
+							>Show graph</button>
 						</div>
 					{/if}
 

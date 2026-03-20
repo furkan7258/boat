@@ -23,3 +23,8 @@ class SearchResult(WordLineRead):
     sentence_text: str
     treebank_title: str
     annotator_username: str
+
+
+class SearchResponse(BaseModel):
+    results: list[SearchResult]
+    total: int

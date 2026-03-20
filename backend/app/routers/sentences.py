@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -94,12 +94,20 @@ async def create_sentence(
 async def delete_sentence(
     sentence_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Sentence).where(Sentence.id == sentence_id))
     sentence = result.scalar_one_or_none()
     if not sentence:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sentence not found")
+    tb_result = await db.execute(
+        select(Treebank).where(Treebank.id == sentence.treebank_id)
+    )
+    treebank = tb_result.scalar_one_or_none()
+    if current_user.id != treebank.created_by:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Not authorized to perform this action"
+        )
     await db.delete(sentence)
     await db.commit()
 
@@ -107,10 +115,18 @@ async def delete_sentence(
 @router.get("/{sentence_id}/annotations", response_model=list[AnnotationRead])
 async def list_sentence_annotations(
     sentence_id: int,
+    limit: int = Query(50, le=200, ge=1),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Annotation).where(Annotation.sentence_id == sentence_id))
+    stmt = (
+        select(Annotation)
+        .where(Annotation.sentence_id == sentence_id)
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 

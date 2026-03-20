@@ -6,9 +6,10 @@
 		field: CellField;
 		tokenId: string;
 		onchange: (tokenId: string, field: CellField, value: string) => void;
+		hasError?: boolean;
 	}
 
-	let { value, field, tokenId, onchange }: Props = $props();
+	let { value, field, tokenId, onchange, hasError = false }: Props = $props();
 
 	let cellEl: HTMLElement | undefined = $state();
 
@@ -95,6 +96,8 @@
 		contenteditable="true"
 		role="textbox"
 		tabindex="0"
+		aria-label="{field.toUpperCase()} for token {tokenId}"
+		aria-invalid={hasError}
 		class="min-w-[2.5rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring focus:bg-background"
 		onblur={handleBlur}
 		onkeydown={handleKeydown}

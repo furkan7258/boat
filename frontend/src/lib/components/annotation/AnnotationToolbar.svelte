@@ -12,9 +12,10 @@
 		onprev: () => void;
 		hasPrev: boolean;
 		hasNext: boolean;
+		loading?: boolean;
 	}
 
-	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, hasPrev, hasNext }: Props = $props();
+	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, hasPrev, hasNext, loading = false }: Props = $props();
 
 	const allColumns = ['ID', 'FORM', 'LEMMA', 'UPOS', 'XPOS', 'FEATS', 'HEAD', 'DEPREL', 'DEPS', 'MISC'];
 
@@ -34,12 +35,12 @@
 	<div class="flex items-center justify-between gap-2">
 		<div class="flex items-center gap-2">
 			<Tooltip text="Previous sentence (Alt+P)">
-				<Button variant="outline" size="sm" onclick={onprev} disabled={!hasPrev}>
+				<Button variant="outline" size="sm" onclick={onprev} disabled={!hasPrev || loading}>
 					Prev
 				</Button>
 			</Tooltip>
 			<Tooltip text="Next sentence (Alt+N)">
-				<Button variant="outline" size="sm" onclick={onnext} disabled={!hasNext}>
+				<Button variant="outline" size="sm" onclick={onnext} disabled={!hasNext || loading}>
 					Next
 				</Button>
 			</Tooltip>

@@ -1,6 +1,33 @@
 """Inter-annotator agreement computation."""
 
+import time
 from collections import defaultdict
+
+# Simple in-memory cache: treebank_id -> (score_dict, timestamp)
+_agreement_cache: dict[int, tuple[dict, float]] = {}
+_CACHE_TTL = 60.0  # seconds
+
+
+def get_cached_agreement(treebank_id: int) -> dict | None:
+    """Return cached agreement result if still valid, else None."""
+    entry = _agreement_cache.get(treebank_id)
+    if entry is None:
+        return None
+    result, ts = entry
+    if time.monotonic() - ts > _CACHE_TTL:
+        del _agreement_cache[treebank_id]
+        return None
+    return result
+
+
+def set_cached_agreement(treebank_id: int, result: dict) -> None:
+    """Store agreement result in cache."""
+    _agreement_cache[treebank_id] = (result, time.monotonic())
+
+
+def invalidate_agreement_cache(treebank_id: int) -> None:
+    """Remove a treebank's cached agreement, e.g. after wordline updates."""
+    _agreement_cache.pop(treebank_id, None)
 
 
 def compute_annotation_agreement(

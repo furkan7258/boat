@@ -10,7 +10,9 @@ class Sentence(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order: Mapped[int] = mapped_column()
-    treebank_id: Mapped[int] = mapped_column(ForeignKey("treebanks.id", ondelete="CASCADE"))
+    treebank_id: Mapped[int] = mapped_column(
+        ForeignKey("treebanks.id", ondelete="CASCADE"), index=True,
+    )
     sent_id: Mapped[str] = mapped_column(String(30), index=True)
     text: Mapped[str] = mapped_column(Text)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)

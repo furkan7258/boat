@@ -8,13 +8,13 @@ from app.core.security import get_current_user
 from app.models.annotation import Annotation
 from app.models.sentence import Sentence
 from app.models.user import User
-from app.models.wordline import WordLine
 from app.schemas.annotation import (
     AnnotationCreate,
     AnnotationDetail,
     AnnotationRead,
     AnnotationUpdate,
 )
+from app.services.wordlines import copy_wordlines
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -53,22 +53,7 @@ async def create_annotation(
     await db.flush()
 
     if template and template.wordlines:
-        for wl in template.wordlines:
-            new_wl = WordLine(
-                annotation_id=annotation.id,
-                id_f=wl.id_f,
-                form=wl.form,
-                lemma=wl.lemma,
-                upos=wl.upos,
-                xpos=wl.xpos,
-                feats=wl.feats,
-                head=wl.head,
-                deprel=wl.deprel,
-                deps=wl.deps,
-                misc=wl.misc,
-            )
-            new_wl.populate_parsed_fields()
-            db.add(new_wl)
+        db.add_all(copy_wordlines(template.wordlines, annotation.id))
 
     await db.commit()
     await db.refresh(annotation)
@@ -137,22 +122,7 @@ async def get_annotation_by_position(
         await db.flush()
 
         if template and template.wordlines:
-            for wl in template.wordlines:
-                new_wl = WordLine(
-                    annotation_id=annotation.id,
-                    id_f=wl.id_f,
-                    form=wl.form,
-                    lemma=wl.lemma,
-                    upos=wl.upos,
-                    xpos=wl.xpos,
-                    feats=wl.feats,
-                    head=wl.head,
-                    deprel=wl.deprel,
-                    deps=wl.deps,
-                    misc=wl.misc,
-                )
-                new_wl.populate_parsed_fields()
-                db.add(new_wl)
+            db.add_all(copy_wordlines(template.wordlines, annotation.id))
 
         await db.commit()
 
@@ -234,6 +204,8 @@ async def delete_annotation(
 @router.get("/mine/", response_model=list[AnnotationDetail])
 async def my_annotations(
     annotation_status: int | None = Query(None, alias="status"),
+    limit: int = Query(50, le=200, ge=1),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -250,6 +222,7 @@ async def my_annotations(
     if annotation_status is not None:
         stmt = stmt.where(Annotation.status == annotation_status)
 
+    stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)
     annotations = result.scalars().all()
 

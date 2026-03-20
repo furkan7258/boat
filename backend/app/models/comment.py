@@ -11,7 +11,7 @@ class Comment(Base, TimestampMixin):
     sentence_id: Mapped[int] = mapped_column(
         ForeignKey("sentences.id", ondelete="CASCADE"), index=True
     )
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
 
     sentence: Mapped["Sentence"] = relationship(back_populates="discussion")  # noqa: F821

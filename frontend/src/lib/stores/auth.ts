@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import type { UserRead } from '$api/types';
 import * as authApi from '$api/auth';
+import { TOKEN_KEY } from '$api/client';
 import { appMode } from '$stores/mode';
 
 export const user = writable<UserRead | null>(null);
@@ -29,7 +30,7 @@ export async function initialize() {
 		return;
 	}
 
-	const token = localStorage.getItem('token');
+	const token = localStorage.getItem(TOKEN_KEY);
 	if (!token) {
 		isLoading.set(false);
 		return;
@@ -38,7 +39,7 @@ export async function initialize() {
 		const me = await authApi.getMe();
 		user.set(me);
 	} catch {
-		localStorage.removeItem('token');
+		localStorage.removeItem(TOKEN_KEY);
 	} finally {
 		isLoading.set(false);
 	}
@@ -46,7 +47,7 @@ export async function initialize() {
 
 export async function login(username: string, password: string) {
 	const { access_token } = await authApi.login(username, password);
-	localStorage.setItem('token', access_token);
+	localStorage.setItem(TOKEN_KEY, access_token);
 	const me = await authApi.getMe();
 	user.set(me);
 }
@@ -63,7 +64,7 @@ export async function register(data: {
 }
 
 export function logout() {
-	localStorage.removeItem('token');
+	localStorage.removeItem(TOKEN_KEY);
 	user.set(null);
 }
 

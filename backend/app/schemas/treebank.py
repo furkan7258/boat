@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TreebankCreate(BaseModel):
-    title: str
-    language: str
+    title: str = Field(min_length=1, max_length=30)
+    language: str = Field(min_length=1, max_length=30)
 
 
 class TreebankRead(BaseModel):

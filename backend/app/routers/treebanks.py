@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from collections.abc import AsyncIterator
+from enum import StrEnum
+
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import case
+from starlette.responses import JSONResponse, StreamingResponse
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -14,14 +18,30 @@ from app.models.validation_profile import ValidationProfile
 from app.models.wordline import WordLine
 from app.schemas.sentence import SentenceBrief
 from app.schemas.treebank import TreebankCreate, TreebankRead, TreebankWithProgress
-from app.services.agreement import compute_annotation_agreement
-from app.services.conllu import LANGUAGES, export_conllu, parse_text, validate_uploaded_text
+from app.services.agreement import (
+    compute_annotation_agreement,
+    get_cached_agreement,
+    set_cached_agreement,
+)
+from app.services.conllu import (
+    LANGUAGES,
+    _format_sentence_block,
+    parse_text,
+    validate_uploaded_text,
+)
+
+
+class ExportFormat(StrEnum):
+    conllu = "conllu"
+    json = "json"
 
 router = APIRouter(prefix="/treebanks", tags=["treebanks"])
 
 
 @router.get("", response_model=list[TreebankWithProgress])
 async def list_treebanks(
+    limit: int = Query(50, le=200, ge=1),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
@@ -40,6 +60,8 @@ async def list_treebanks(
         .outerjoin(Annotation, Annotation.sentence_id == Sentence.id)
         .group_by(Treebank.id)
         .order_by(Treebank.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     result = await db.execute(stmt)
     rows = result.all()
@@ -62,12 +84,12 @@ async def list_treebanks(
 async def create_treebank(
     body: TreebankCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Treebank).where(Treebank.title == body.title))
     if result.scalar_one_or_none():
         raise HTTPException(status.HTTP_409_CONFLICT, "Treebank title already exists")
-    treebank = Treebank(title=body.title, language=body.language)
+    treebank = Treebank(title=body.title, language=body.language, created_by=current_user.id)
     db.add(treebank)
     await db.flush()
 
@@ -123,12 +145,16 @@ async def get_treebank(
 async def delete_treebank(
     treebank_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Treebank).where(Treebank.id == treebank_id))
     treebank = result.scalar_one_or_none()
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
+    if current_user.id != treebank.created_by:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Not authorized to perform this action"
+        )
     await db.delete(treebank)
     await db.commit()
 
@@ -156,6 +182,10 @@ async def upload_conllu(
     treebank = result.scalar_one_or_none()
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
+    if current_user.id != treebank.created_by:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Not authorized to perform this action"
+        )
 
     max_size = 10 * 1024 * 1024  # 10 MB
     raw = await file.read()
@@ -164,7 +194,14 @@ async def upload_conllu(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             f"File too large ({len(raw) / 1024 / 1024:.1f} MB). Maximum is 10 MB.",
         )
-    content = raw.decode("utf-8").replace("\r\n", "\n")
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError as err:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "File is not valid UTF-8",
+        ) from err
+    content = content.replace("\r\n", "\n")
     if not content.endswith("\n"):
         content += "\n"
     if not validate_uploaded_text(content):
@@ -229,9 +266,55 @@ async def upload_conllu(
     return {"sentences_created": created_count}
 
 
+def _annotation_matches(
+    anno: Annotation,
+    *,
+    annotator_id: int | None,
+    current_user_id: int,
+) -> bool:
+    """Check whether an annotation matches the export filter criteria.
+
+    If *annotator_id* is given, select that user's non-template annotations.
+    Otherwise fall back to the current user's annotations (original behaviour).
+    """
+    if annotator_id is not None:
+        return anno.annotator_id == annotator_id and not anno.is_template
+    return anno.annotator_id == current_user_id
+
+
+def _sentence_to_export_dict(sent: Sentence, anno: Annotation) -> dict:
+    """Convert a sentence + annotation pair into a serialisable dict."""
+    return {
+        "sent_id": sent.sent_id,
+        "text": sent.text,
+        "metadata": sent.metadata_,
+        "wordlines": [
+            {
+                "id_f": wl.id_f,
+                "form": wl.form,
+                "lemma": wl.lemma,
+                "upos": wl.upos,
+                "xpos": wl.xpos,
+                "feats": wl.feats,
+                "head": wl.head,
+                "deprel": wl.deprel,
+                "deps": wl.deps,
+                "misc": wl.misc,
+            }
+            for wl in anno.wordlines
+        ],
+    }
+
+
 @router.get("/{treebank_id}/export")
-async def export_treebank_conllu(
+async def export_treebank(
     treebank_id: int,
+    format: ExportFormat = Query(ExportFormat.conllu, description="Export format"),
+    annotator_id: int | None = Query(
+        None,
+        description="Export a specific annotator's (non-template) annotations. "
+        "If omitted, exports the current user's annotations.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -240,7 +323,13 @@ async def export_treebank_conllu(
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
 
-    # Fetch sentences with user's annotations and wordlines
+    # Validate annotator_id if provided
+    if annotator_id is not None:
+        user_result = await db.execute(select(User).where(User.id == annotator_id))
+        if not user_result.scalar_one_or_none():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Annotator not found")
+
+    # Fetch sentences with annotations and wordlines
     stmt = (
         select(Sentence)
         .where(Sentence.treebank_id == treebank_id)
@@ -250,42 +339,41 @@ async def export_treebank_conllu(
     result = await db.execute(stmt)
     sentences = result.scalars().all()
 
+    # Build export data, filtering annotations by the requested criteria
     export_data: list[dict] = []
     for sent in sentences:
-        user_annos = [a for a in sent.annotations if a.annotator_id == current_user.id]
-        for anno in user_annos:
+        matching = [
+            a
+            for a in sent.annotations
+            if _annotation_matches(
+                a, annotator_id=annotator_id, current_user_id=current_user.id
+            )
+        ]
+        for anno in matching:
             if not anno.wordlines:
                 continue
-            export_data.append(
-                {
-                    "sent_id": sent.sent_id,
-                    "text": sent.text,
-                    "metadata": sent.metadata_,
-                    "wordlines": [
-                        {
-                            "id_f": wl.id_f,
-                            "form": wl.form,
-                            "lemma": wl.lemma,
-                            "upos": wl.upos,
-                            "xpos": wl.xpos,
-                            "feats": wl.feats,
-                            "head": wl.head,
-                            "deprel": wl.deprel,
-                            "deps": wl.deps,
-                            "misc": wl.misc,
-                        }
-                        for wl in anno.wordlines
-                    ],
-                }
-            )
+            export_data.append(_sentence_to_export_dict(sent, anno))
 
-    conllu_text = export_conllu(export_data)
-    from fastapi.responses import PlainTextResponse
+    # --- JSON format ---------------------------------------------------------
+    if format == ExportFormat.json:
+        return JSONResponse(
+            content=export_data,
+            headers={
+                "Content-Disposition": f'attachment; filename="{treebank.title}.json"',
+            },
+        )
 
-    return PlainTextResponse(
-        content=conllu_text,
-        media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{treebank.title}.conllu"'},
+    # --- CoNLL-U format (streaming) ------------------------------------------
+    async def _stream_conllu() -> AsyncIterator[str]:
+        for sent_dict in export_data:
+            yield _format_sentence_block(sent_dict)
+
+    return StreamingResponse(
+        _stream_conllu(),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{treebank.title}.conllu"',
+        },
     )
 
 
@@ -295,39 +383,58 @@ async def treebank_agreement(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    # Fetch all sentences with annotations and wordlines
+    # Check cache first
+    cached = get_cached_agreement(treebank_id)
+    if cached is not None:
+        return cached
+
+    # Only fetch non-template annotations with the specific wordline fields
+    # needed for agreement comparison, filtering at the SQL level.
     stmt = (
-        select(Sentence)
-        .where(Sentence.treebank_id == treebank_id)
-        .options(selectinload(Sentence.annotations).selectinload(Annotation.wordlines))
+        select(
+            Annotation.sentence_id,
+            Annotation.id,
+            WordLine.id_f,
+            WordLine.form,
+            WordLine.lemma,
+            WordLine.upos,
+            WordLine.feats,
+            WordLine.head,
+            WordLine.deprel,
+        )
+        .join(Sentence, Sentence.id == Annotation.sentence_id)
+        .join(WordLine, WordLine.annotation_id == Annotation.id)
+        .where(
+            Sentence.treebank_id == treebank_id,
+            Annotation.is_template.is_(False),
+        )
     )
     result = await db.execute(stmt)
-    sentences = result.scalars().all()
+    rows = result.all()
+
+    # Pre-index: sentence_id -> annotation_id -> [wordline dicts]
+    sentence_annos: dict[int, dict[int, list[dict]]] = {}
+    for sentence_id, anno_id, id_f, form, lemma, upos, feats, head, deprel in rows:
+        annos = sentence_annos.setdefault(sentence_id, {})
+        wl_list = annos.setdefault(anno_id, [])
+        wl_list.append({
+            "id_f": id_f,
+            "form": form,
+            "lemma": lemma,
+            "upos": upos,
+            "feats": feats,
+            "head": head,
+            "deprel": deprel,
+        })
 
     agreement_sum = 0.0
     scored_count = 0
 
-    for sent in sentences:
-        # Only consider non-template annotations
-        annos = [a for a in sent.annotations if not a.is_template]
-        if len(annos) < 2:
+    for annos_by_id in sentence_annos.values():
+        if len(annos_by_id) < 2:
             continue
 
-        wordline_lists = [
-            [
-                {
-                    "id_f": wl.id_f,
-                    "form": wl.form,
-                    "lemma": wl.lemma,
-                    "upos": wl.upos,
-                    "feats": wl.feats,
-                    "head": wl.head,
-                    "deprel": wl.deprel,
-                }
-                for wl in anno.wordlines
-            ]
-            for anno in annos
-        ]
+        wordline_lists = list(annos_by_id.values())
 
         score = compute_annotation_agreement(wordline_lists)
         if score == -1:
@@ -335,8 +442,10 @@ async def treebank_agreement(
         agreement_sum += score
         scored_count += 1
 
-    return {
+    response = {
         "treebank_id": treebank_id,
         "agreement": agreement_sum / scored_count if scored_count else 0,
         "sentences_scored": scored_count,
     }
+    set_cached_agreement(treebank_id, response)
+    return response

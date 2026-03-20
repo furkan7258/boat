@@ -47,35 +47,35 @@
 		</div>
 
 		{#if error}
-			<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+			<div id="register-error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div>
 		{/if}
 
 		<form onsubmit={handleSubmit} class="space-y-4">
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-2">
 					<label for="firstName" class="text-sm font-medium">First name</label>
-					<Input id="firstName" bind:value={firstName} required />
+					<Input id="firstName" bind:value={firstName} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 				</div>
 				<div class="space-y-2">
 					<label for="lastName" class="text-sm font-medium">Last name</label>
-					<Input id="lastName" bind:value={lastName} required />
+					<Input id="lastName" bind:value={lastName} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 				</div>
 			</div>
 			<div class="space-y-2">
 				<label for="username" class="text-sm font-medium">Username</label>
-				<Input id="username" bind:value={username} required />
+				<Input id="username" bind:value={username} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 			</div>
 			<div class="space-y-2">
 				<label for="email" class="text-sm font-medium">Email</label>
-				<Input id="email" type="email" bind:value={email} required />
+				<Input id="email" type="email" bind:value={email} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 			</div>
 			<div class="space-y-2">
 				<label for="password" class="text-sm font-medium">Password</label>
-				<Input id="password" type="password" bind:value={password} required />
+				<Input id="password" type="password" bind:value={password} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 			</div>
 			<div class="space-y-2">
 				<label for="password2" class="text-sm font-medium">Confirm password</label>
-				<Input id="password2" type="password" bind:value={password2} required />
+				<Input id="password2" type="password" bind:value={password2} required aria-invalid={!!error} aria-describedby={error ? 'register-error' : undefined} />
 			</div>
 			<Button type="submit" class="w-full" disabled={loading}>
 				{loading ? 'Creating account...' : 'Register'}

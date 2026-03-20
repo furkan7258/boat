@@ -16,8 +16,12 @@ class Annotation(Base, TimestampMixin):
     __tablename__ = "annotations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    annotator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    sentence_id: Mapped[int] = mapped_column(ForeignKey("sentences.id", ondelete="CASCADE"))
+    annotator_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True,
+    )
+    sentence_id: Mapped[int] = mapped_column(
+        ForeignKey("sentences.id", ondelete="CASCADE"), index=True,
+    )
     notes: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[int] = mapped_column(SmallInteger, default=AnnotationStatus.NEW)
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)

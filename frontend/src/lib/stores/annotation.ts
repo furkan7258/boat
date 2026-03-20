@@ -33,6 +33,8 @@ export const COLUMN_LABELS: Record<string, string> = {
 	misc: 'MISC'
 };
 
+const MAX_HISTORY = 100;
+
 interface Edit {
 	tokenId: string;
 	field: CellField;
@@ -94,7 +96,10 @@ export function updateCell(tokenId: string, field: CellField, value: string) {
 		const oldValue = $cells[idx][field];
 		if (oldValue === value) return $cells;
 
-		editHistory.update(($h) => [...$h, { tokenId, field, oldValue, newValue: value }]);
+		editHistory.update(($h) => {
+			const next = [...$h, { tokenId, field, oldValue, newValue: value }];
+			return next.length > MAX_HISTORY ? next.slice(-MAX_HISTORY) : next;
+		});
 		redoStack.set([]);
 
 		const updated = [...$cells];
@@ -208,6 +213,37 @@ export function getCellsForSave(): Array<{
 		deps: c.deps,
 		misc: c.misc
 	}));
+}
+
+// Draft persistence (localStorage)
+const DRAFT_PREFIX = 'boat-draft-';
+
+export function saveDraft(id: number): void {
+	try {
+		const data = JSON.stringify(get(cells));
+		localStorage.setItem(`${DRAFT_PREFIX}${id}`, data);
+	} catch {
+		// Ignore quota or serialization errors
+	}
+}
+
+export function loadDraft(id: number): Cell[] | null {
+	try {
+		const raw = localStorage.getItem(`${DRAFT_PREFIX}${id}`);
+		if (!raw) return null;
+		return JSON.parse(raw) as Cell[];
+	} catch {
+		clearDraft(id);
+		return null;
+	}
+}
+
+export function clearDraft(id: number): void {
+	try {
+		localStorage.removeItem(`${DRAFT_PREFIX}${id}`);
+	} catch {
+		// Ignore
+	}
 }
 
 function wordlineToCell(wl: WordLineRead): Cell {

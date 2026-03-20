@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { search, type SearchQuery } from '$api/search';
 	import { listTreebanks } from '$api/treebanks';
-	import type { SearchResult, TreebankWithProgress } from '$api/types';
+	import type { SearchResult, SearchResponse, TreebankWithProgress } from '$api/types';
 	import Button from '$components/common/Button.svelte';
 	import Input from '$components/common/Input.svelte';
 
@@ -19,6 +19,7 @@
 	let selectedTreebank = $state('');
 	let queries = $state<QueryRow[]>([{ field: 'upos', value: '' }]);
 	let results = $state<SearchResult[]>([]);
+	let total = $state(0);
 	let searched = $state(false);
 	let loading = $state(false);
 	let currentPage = $state(0);
@@ -43,7 +44,9 @@
 		const activeQueries: SearchQuery[] = queries
 			.filter((q) => q.value.trim())
 			.map((q) => ({ field: q.field, value: q.value.trim() }));
-		results = await search(activeQueries, selectedTreebank || undefined, 0, pageSize);
+		const response = await search(activeQueries, selectedTreebank || undefined, 0, pageSize);
+		results = response.results;
+		total = response.total;
 		searched = true;
 		loading = false;
 	}
@@ -54,7 +57,9 @@
 		const activeQueries: SearchQuery[] = queries
 			.filter((q) => q.value.trim())
 			.map((q) => ({ field: q.field, value: q.value.trim() }));
-		results = await search(activeQueries, selectedTreebank || undefined, p * pageSize, pageSize);
+		const response = await search(activeQueries, selectedTreebank || undefined, p * pageSize, pageSize);
+		results = response.results;
+		total = response.total;
 		loading = false;
 	}
 </script>
@@ -139,8 +144,10 @@
 				<Button variant="outline" size="sm" disabled={currentPage === 0} onclick={() => goPage(currentPage - 1)}>
 					Previous
 				</Button>
-				<span class="text-sm text-muted-foreground">Page {currentPage + 1}</span>
-				<Button variant="outline" size="sm" disabled={results.length < pageSize} onclick={() => goPage(currentPage + 1)}>
+				<span class="text-sm text-muted-foreground">
+					Showing {currentPage * pageSize + 1}–{currentPage * pageSize + results.length} of {total} results
+				</span>
+				<Button variant="outline" size="sm" disabled={currentPage * pageSize + results.length >= total} onclick={() => goPage(currentPage + 1)}>
 					Next
 				</Button>
 			</div>

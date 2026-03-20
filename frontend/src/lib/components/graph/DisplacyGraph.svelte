@@ -258,6 +258,7 @@
 				height={layout.height}
 				viewBox="0 0 {layout.width} {layout.height}"
 				class="select-none"
+				style="min-width: {Math.max(layout.width, layout.tokens.length * 50)}px;"
 			>
 				<!-- Arcs -->
 				{#each layout.arcs as arc}

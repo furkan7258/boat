@@ -39,27 +39,28 @@ async def populated_treebank(client, auth_headers):
 async def test_search_by_upos(client, auth_headers, populated_treebank):
     response = await client.get("/api/search", headers=auth_headers, params={"upos": "NOUN"})
     assert response.status_code == 200
-    results = response.json()
-    assert len(results) >= 2
-    assert all(r["upos"] == "NOUN" for r in results)
+    data = response.json()
+    assert data["total"] >= 2
+    assert len(data["results"]) >= 2
+    assert all(r["upos"] == "NOUN" for r in data["results"])
 
 
 @pytest.mark.asyncio
 async def test_search_by_form(client, auth_headers, populated_treebank):
     response = await client.get("/api/search", headers=auth_headers, params={"form": "cat"})
     assert response.status_code == 200
-    results = response.json()
-    assert len(results) >= 1
-    assert results[0]["form"] == "cat"
-    assert results[0]["treebank_title"] == "Search-TB"
+    data = response.json()
+    assert len(data["results"]) >= 1
+    assert data["results"][0]["form"] == "cat"
+    assert data["results"][0]["treebank_title"] == "Search-TB"
 
 
 @pytest.mark.asyncio
 async def test_search_by_deprel(client, auth_headers, populated_treebank):
     response = await client.get("/api/search", headers=auth_headers, params={"deprel": "root"})
     assert response.status_code == 200
-    results = response.json()
-    assert len(results) >= 2
+    data = response.json()
+    assert len(data["results"]) >= 2
 
 
 @pytest.mark.asyncio
@@ -68,7 +69,7 @@ async def test_search_by_treebank_title(client, auth_headers, populated_treebank
         "/api/search", headers=auth_headers, params={"treebank_title": "Search"}
     )
     assert response.status_code == 200
-    assert len(response.json()) >= 1
+    assert len(response.json()["results"]) >= 1
 
 
 @pytest.mark.asyncio
@@ -77,7 +78,9 @@ async def test_search_empty_results(client, auth_headers, populated_treebank):
         "/api/search", headers=auth_headers, params={"form": "nonexistent"}
     )
     assert response.status_code == 200
-    assert len(response.json()) == 0
+    data = response.json()
+    assert data["total"] == 0
+    assert len(data["results"]) == 0
 
 
 @pytest.mark.asyncio
@@ -88,4 +91,4 @@ async def test_search_with_pagination(client, auth_headers, populated_treebank):
         params={"limit": 2, "offset": 0},
     )
     assert response.status_code == 200
-    assert len(response.json()) <= 2
+    assert len(response.json()["results"]) <= 2

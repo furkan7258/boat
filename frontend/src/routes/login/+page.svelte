@@ -33,17 +33,17 @@
 		</div>
 
 		{#if error}
-			<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+			<div id="login-error" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div>
 		{/if}
 
 		<form onsubmit={handleSubmit} class="space-y-4">
 			<div class="space-y-2">
 				<label for="username" class="text-sm font-medium">Username</label>
-				<Input id="username" bind:value={username} required placeholder="Username" />
+				<Input id="username" bind:value={username} required placeholder="Username" aria-invalid={!!error} aria-describedby={error ? 'login-error' : undefined} />
 			</div>
 			<div class="space-y-2">
 				<label for="password" class="text-sm font-medium">Password</label>
-				<Input id="password" type="password" bind:value={password} required placeholder="Password" />
+				<Input id="password" type="password" bind:value={password} required placeholder="Password" aria-invalid={!!error} aria-describedby={error ? 'login-error' : undefined} />
 			</div>
 			<Button type="submit" class="w-full" disabled={loading}>
 				{loading ? 'Signing in...' : 'Sign in'}

@@ -12,7 +12,8 @@ from app.main import create_app
 from app.models.base import Base
 from app.models.user import User
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Use PostgreSQL when DATABASE_URL is set (CI), otherwise fall back to SQLite in-memory.
+TEST_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
 
 @pytest.fixture
@@ -35,6 +36,8 @@ async def db_session(db_engine):
 
 @pytest.fixture
 async def app(db_engine):
+    from app.core.rate_limit import _limiter
+
     application = create_app()
     session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -43,6 +46,7 @@ async def app(db_engine):
             yield session
 
     application.dependency_overrides[get_db] = override_get_db
+    _limiter.reset()
     return application
 
 

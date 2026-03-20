@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.middleware import RequestLoggingMiddleware
 from app.routers import (
     annotations,
     auth,
@@ -21,6 +22,8 @@ def create_app() -> FastAPI:
         description="Boğaziçi University Annotation Tool — API",
         version="3.0.0",
     )
+
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

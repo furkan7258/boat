@@ -10,6 +10,7 @@
 	import Modal from '$components/common/Modal.svelte';
 	import Breadcrumb from '$components/layout/Breadcrumb.svelte';
 	import EmptyState from '$components/common/EmptyState.svelte';
+	import ErrorState from '$components/common/ErrorState.svelte';
 	import Skeleton from '$components/common/Skeleton.svelte';
 	import { FileText } from 'lucide-svelte';
 
@@ -18,6 +19,7 @@
 	let treebank = $state<TreebankRead | null>(null);
 	let sentences = $state<SentenceBrief[]>([]);
 	let loading = $state(true);
+	let error = $state('');
 	let currentPage = $state(0);
 	const pageSize = 20;
 	let allSentences = $state<SentenceBrief[]>([]);
@@ -94,10 +96,16 @@
 
 	async function loadData() {
 		loading = true;
-		const tb = await getTreebankByTitle(treebankTitle);
-		treebank = tb;
-		allSentences = await listSentences(tb.id);
-		loading = false;
+		error = '';
+		try {
+			const tb = await getTreebankByTitle(treebankTitle);
+			treebank = tb;
+			allSentences = await listSentences(tb.id);
+		} catch (err) {
+			error = err instanceof ApiError ? err.detail : 'Failed to load treebank';
+		} finally {
+			loading = false;
+		}
 	}
 
 	function goPage(p: number) {
@@ -168,6 +176,8 @@
 				</div>
 			{/each}
 		</div>
+	{:else if error}
+		<ErrorState message={error} onRetry={loadData} />
 	{:else if treebank}
 		<div class="mb-6">
 			<div class="mb-2">

@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { SearchResult } from './types';
+import type { SearchResponse } from './types';
 
 export interface SearchQuery {
 	field: string;
@@ -14,5 +14,5 @@ export function search(queries: SearchQuery[], treebankTitle?: string, offset = 
 	if (treebankTitle) params.set('treebank_title', treebankTitle);
 	params.set('offset', String(offset));
 	params.set('limit', String(limit));
-	return api.get<SearchResult[]>(`/search?${params}`);
+	return api.get<SearchResponse>(`/search?${params}`);
 }

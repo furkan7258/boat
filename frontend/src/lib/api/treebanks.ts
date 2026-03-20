@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
-import { api } from './client';
-import { appMode, serverUrl } from '$stores/mode';
+import { api, getBaseUrl, TOKEN_KEY } from './client';
+import { appMode } from '$stores/mode';
 import type { TreebankRead, TreebankWithProgress, AgreementResponse } from './types';
 
 export function listTreebanks() {
@@ -37,8 +37,8 @@ export async function exportConllu(id: number) {
 		return;
 	}
 
-	const base = get(appMode) === 'connected' ? `${get(serverUrl)}/api` : '/api';
-	const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+	const base = getBaseUrl();
+	const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
 	const headers: Record<string, string> = {};
 	if (token) headers['Authorization'] = `Bearer ${token}`;
 	const res = await fetch(`${base}/treebanks/${id}/export`, { headers });
