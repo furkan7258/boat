@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cells, updateCell, addRow, removeRow, COLUMN_LABELS, type CellField } from '$stores/annotation';
+	import { cells, initialCells, updateCell, addRow, removeRow, COLUMN_LABELS, type CellField } from '$stores/annotation';
 	import AnnotationCell from './AnnotationCell.svelte';
 	import SearchableSelect from './SearchableSelect.svelte';
 	import FeatsEditor from './FeatsEditor.svelte';
@@ -10,10 +10,11 @@
 		visibleColumns: string[];
 		selectedTokenId?: string | null;
 		validationProfile?: ValidationProfileRead | null;
+		validationErrors?: Map<string, string[]>;
 		onTokenSelect?: (tokenId: string) => void;
 	}
 
-	let { visibleColumns, selectedTokenId = null, validationProfile = null, onTokenSelect }: Props = $props();
+	let { visibleColumns, selectedTokenId = null, validationProfile = null, validationErrors = new Map(), onTokenSelect }: Props = $props();
 
 	const allColumns = ['id_f', 'form', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc'];
 	const editableFields: CellField[] = ['form', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc'];
@@ -50,26 +51,26 @@
 		return editableFields.includes(col as CellField);
 	}
 
-	// Set of valid token IDs for HEAD validation
-	const validIds = $derived(new Set($cells.map((c) => c.id_f)));
-
 	// Enable native browser virtualization for long sentences (100+ tokens)
 	const isLongSentence = $derived($cells.length > 100);
 
-	// Inline validation
-	function cellError(cell: typeof $cells[0], col: string): string | null {
-		if (col === 'upos' && cell.upos !== '_' && !UPOS_TAGS.includes(cell.upos as any)) {
-			return `Invalid UPOS: ${cell.upos}`;
-		}
-		if (col === 'head') {
-			if (cell.head !== '_' && cell.head !== '0') {
-				const n = parseInt(cell.head);
-				if (isNaN(n) || n < 0) return `Invalid HEAD: ${cell.head}`;
-				if (cell.head === cell.id_f) return 'Self-loop: HEAD equals own ID';
-				if (!validIds.has(cell.head)) return `HEAD ${cell.head} does not exist`;
-			}
-		}
-		return null;
+	// Look up validation errors for a given cell and column
+	function cellErrors(cellId: string, col: string): string[] | null {
+		const key = `${cellId}:${col}`;
+		const msgs = validationErrors.get(key);
+		return msgs && msgs.length > 0 ? msgs : null;
+	}
+
+	// Build a lookup from initial cells for diff highlighting
+	const initialMap = $derived(
+		new Map($initialCells.map((c) => [c.id_f, c]))
+	);
+
+	function isCellChanged(cell: typeof $cells[0], col: string): boolean {
+		if (col === 'id_f') return false;
+		const init = initialMap.get(cell.id_f);
+		if (!init) return false;
+		return cell[col as CellField] !== init[col as CellField];
 	}
 </script>
 
@@ -96,7 +97,8 @@
 					onclick={() => onTokenSelect?.(cell.id_f)}
 				>
 					{#each columns as col}
-						{@const error = cellError(cell, col)}
+						{@const errors = cellErrors(cell.id_f, col)}
+						{@const changed = isCellChanged(cell, col)}
 						{#if col === 'id_f'}
 							<td class="border-r border-border px-2 py-1 text-xs font-mono text-muted-foreground">
 								{cell.id_f}
@@ -106,16 +108,19 @@
 								value={cell.upos}
 								options={UPOS_TAGS}
 								onchange={(v) => handleSelectChange(cell.id_f, 'upos', v)}
-								class={error ? 'ring-2 ring-destructive/50' : ''}
+								class="{errors ? 'ring-2 ring-destructive/50' : ''} {changed ? 'bg-blue-50 dark:bg-blue-950/30' : ''}"
+								title={errors ? errors.join('; ') : undefined}
 							/>
 						{:else if col === 'deprel'}
 							<SearchableSelect
 								value={cell.deprel}
 								options={DEPREL_TAGS}
 								onchange={(v) => handleSelectChange(cell.id_f, 'deprel', v)}
+								class="{errors ? 'ring-2 ring-destructive/50' : ''} {changed ? 'bg-blue-50 dark:bg-blue-950/30' : ''}"
+								title={errors ? errors.join('; ') : undefined}
 							/>
 						{:else if col === 'feats'}
-							<td class="border-r border-border px-1 py-0.5">
+							<td class="border-r border-border px-1 py-0.5 {changed ? 'bg-blue-50 dark:bg-blue-950/30' : ''} {errors ? 'border-b-2 border-b-destructive' : ''}" title={errors ? errors.join('; ') : undefined}>
 								<button
 									onclick={() => openFeatsEditor(cell.id_f, cell.feats, 'feats')}
 									class="w-full text-left rounded px-1 py-0.5 text-xs outline-none hover:bg-muted cursor-pointer truncate max-w-[10rem]"
@@ -125,7 +130,7 @@
 								</button>
 							</td>
 						{:else if col === 'misc'}
-							<td class="border-r border-border px-1 py-0.5">
+							<td class="border-r border-border px-1 py-0.5 {changed ? 'bg-blue-50 dark:bg-blue-950/30' : ''} {errors ? 'border-b-2 border-b-destructive' : ''}" title={errors ? errors.join('; ') : undefined}>
 								<button
 									onclick={() => openFeatsEditor(cell.id_f, cell.misc, 'misc')}
 									class="w-full text-left rounded px-1 py-0.5 text-xs outline-none hover:bg-muted cursor-pointer truncate max-w-[10rem]"
@@ -140,16 +145,12 @@
 								field={col}
 								tokenId={cell.id_f}
 								onchange={handleCellChange}
-								hasError={!!error}
+								hasError={!!errors}
+								errorMessages={errors ?? []}
+								isChanged={changed}
 							/>
 						{:else}
 							<td class="border-r border-border px-2 py-0.5 text-xs">{cell[col as keyof typeof cell]}</td>
-						{/if}
-						<!-- Validation tooltip -->
-						{#if error && col !== 'upos'}
-							<td class="p-0 w-0 relative">
-								<span class="absolute -left-4 top-0 text-destructive text-[10px]" title={error} role="alert" aria-label="Validation error">!</span>
-							</td>
 						{/if}
 					{/each}
 					<td class="px-1 py-0.5">

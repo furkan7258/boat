@@ -7,9 +7,11 @@
 		tokenId: string;
 		onchange: (tokenId: string, field: CellField, value: string) => void;
 		hasError?: boolean;
+		errorMessages?: string[];
+		isChanged?: boolean;
 	}
 
-	let { value, field, tokenId, onchange, hasError = false }: Props = $props();
+	let { value, field, tokenId, onchange, hasError = false, errorMessages = [], isChanged = false }: Props = $props();
 
 	let cellEl: HTMLElement | undefined = $state();
 
@@ -89,7 +91,10 @@
 	}
 </script>
 
-<td class="border-r border-border px-1 py-0.5">
+<td
+	class="border-r border-border px-1 py-0.5 {isChanged ? 'bg-blue-50 dark:bg-blue-950/30' : ''} {hasError ? 'border-b-2 border-b-destructive' : ''}"
+	title={hasError ? errorMessages.join('; ') : undefined}
+>
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		bind:this={cellEl}
@@ -98,7 +103,7 @@
 		tabindex="0"
 		aria-label="{field.toUpperCase()} for token {tokenId}"
 		aria-invalid={hasError}
-		class="min-w-[2.5rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring focus:bg-background"
+		class="min-w-[2.5rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring focus:bg-background {hasError ? 'text-destructive' : ''}"
 		onblur={handleBlur}
 		onkeydown={handleKeydown}
 		onfocus={handleFocus}

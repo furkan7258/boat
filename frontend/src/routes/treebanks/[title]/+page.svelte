@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { getTreebankByTitle, uploadConllu, exportConllu } from '$api/treebanks';
+	import { getTreebankByTitle, uploadConllu, exportConllu, getTreebankStats } from '$api/treebanks';
 	import { listSentences, createSentence, deleteSentence } from '$api/sentences';
 	import { ApiError } from '$api/client';
-	import type { TreebankRead, SentenceBrief } from '$api/types';
+	import type { TreebankRead, SentenceBrief, TreebankStats } from '$api/types';
 	import Button from '$components/common/Button.svelte';
 	import Input from '$components/common/Input.svelte';
 	import Modal from '$components/common/Modal.svelte';
@@ -23,6 +23,45 @@
 	let currentPage = $state(0);
 	const pageSize = 20;
 	let allSentences = $state<SentenceBrief[]>([]);
+
+	// Tabs
+	let activeTab = $state<'sentences' | 'statistics'>('sentences');
+
+	// Statistics
+	let stats = $state<TreebankStats | null>(null);
+	let statsLoading = $state(false);
+	let statsError = $state('');
+	let statsLoaded = $state(false);
+
+	async function loadStats() {
+		if (!treebank || statsLoaded) return;
+		statsLoading = true;
+		statsError = '';
+		try {
+			stats = await getTreebankStats(treebank.id);
+			statsLoaded = true;
+		} catch (err) {
+			statsError = err instanceof ApiError ? err.detail : 'Failed to load statistics';
+		} finally {
+			statsLoading = false;
+		}
+	}
+
+	function switchTab(tab: 'sentences' | 'statistics') {
+		activeTab = tab;
+		if (tab === 'statistics') loadStats();
+	}
+
+	function computeSentenceStats(lengths: number[]) {
+		if (lengths.length === 0) return { min: 0, max: 0, mean: 0, median: 0 };
+		const sorted = [...lengths].sort((a, b) => a - b);
+		const min = sorted[0];
+		const max = sorted[sorted.length - 1];
+		const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+		const mid = Math.floor(sorted.length / 2);
+		const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+		return { min, max, mean: Math.round(mean * 10) / 10, median };
+	}
 
 	// Filtering
 	let activeFilters = $state<Record<string, string>>({});
@@ -208,7 +247,149 @@
 			</div>
 		</div>
 
-		{#if allSentences.length === 0}
+		<!-- Tabs -->
+		<div class="mb-6 flex gap-1 border-b border-border">
+			<button
+				onclick={() => switchTab('sentences')}
+				class="cursor-pointer px-4 py-2 text-sm font-medium transition-colors {activeTab === 'sentences' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+			>
+				Sentences
+			</button>
+			<button
+				onclick={() => switchTab('statistics')}
+				class="cursor-pointer px-4 py-2 text-sm font-medium transition-colors {activeTab === 'statistics' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+			>
+				Statistics
+			</button>
+		</div>
+
+		{#if activeTab === 'statistics'}
+			{#if statsLoading}
+				<div class="space-y-4">
+					<Skeleton class="h-6 w-48" />
+					<Skeleton class="h-40 w-full" />
+					<Skeleton class="h-6 w-48" />
+					<Skeleton class="h-40 w-full" />
+				</div>
+			{:else if statsError}
+				<ErrorState message={statsError} onRetry={loadStats} />
+			{:else if stats}
+				{@const sentStats = computeSentenceStats(stats.sentence_lengths)}
+				<!-- Summary cards -->
+				<div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+					<div class="rounded-lg border border-border p-4">
+						<div class="text-sm text-muted-foreground">Total sentences</div>
+						<div class="text-2xl font-bold">{stats.total_sentences.toLocaleString()}</div>
+					</div>
+					<div class="rounded-lg border border-border p-4">
+						<div class="text-sm text-muted-foreground">Total tokens</div>
+						<div class="text-2xl font-bold">{stats.total_tokens.toLocaleString()}</div>
+					</div>
+					<div class="rounded-lg border border-border p-4">
+						<div class="text-sm text-muted-foreground">Mean sentence length</div>
+						<div class="text-2xl font-bold">{sentStats.mean}</div>
+					</div>
+					<div class="rounded-lg border border-border p-4">
+						<div class="text-sm text-muted-foreground">Median sentence length</div>
+						<div class="text-2xl font-bold">{sentStats.median}</div>
+					</div>
+				</div>
+
+				<!-- UPOS distribution -->
+				{#if Object.keys(stats.upos_distribution).length > 0}
+					{@const uposMax = Math.max(...Object.values(stats.upos_distribution))}
+					<div class="mb-8">
+						<h2 class="mb-3 text-lg font-semibold">UPOS distribution</h2>
+						<div class="space-y-1.5">
+							{#each Object.entries(stats.upos_distribution) as [tag, count]}
+								<div class="flex items-center gap-3 text-sm">
+									<span class="w-16 shrink-0 text-right font-mono text-xs">{tag}</span>
+									<div class="h-5 flex-1 rounded bg-muted">
+										<div
+											class="h-full rounded bg-primary/70"
+											style="width: {(count / uposMax) * 100}%"
+										></div>
+									</div>
+									<span class="w-16 shrink-0 text-right text-muted-foreground tabular-nums">{count.toLocaleString()}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- DEPREL distribution -->
+				{#if Object.keys(stats.deprel_distribution).length > 0}
+					{@const deprelMax = Math.max(...Object.values(stats.deprel_distribution))}
+					<div class="mb-8">
+						<h2 class="mb-3 text-lg font-semibold">DEPREL distribution</h2>
+						<div class="space-y-1.5">
+							{#each Object.entries(stats.deprel_distribution) as [rel, count]}
+								<div class="flex items-center gap-3 text-sm">
+									<span class="w-24 shrink-0 text-right font-mono text-xs">{rel}</span>
+									<div class="h-5 flex-1 rounded bg-muted">
+										<div
+											class="h-full rounded bg-blue-500/70 dark:bg-blue-400/70"
+											style="width: {(count / deprelMax) * 100}%"
+										></div>
+									</div>
+									<span class="w-16 shrink-0 text-right text-muted-foreground tabular-nums">{count.toLocaleString()}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Top lemmas -->
+				{#if stats.top_lemmas.length > 0}
+					<div class="mb-8">
+						<h2 class="mb-3 text-lg font-semibold">Top 20 lemmas</h2>
+						<div class="overflow-hidden rounded-lg border border-border">
+							<table class="w-full text-sm">
+								<thead class="bg-muted text-left">
+									<tr>
+										<th class="px-4 py-2 font-medium w-12">#</th>
+										<th class="px-4 py-2 font-medium">Lemma</th>
+										<th class="px-4 py-2 font-medium text-right">Count</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each stats.top_lemmas as { lemma, count }, i}
+										<tr class="border-t border-border">
+											<td class="px-4 py-2 text-muted-foreground">{i + 1}</td>
+											<td class="px-4 py-2 font-mono">{lemma}</td>
+											<td class="px-4 py-2 text-right tabular-nums">{count.toLocaleString()}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Sentence length stats -->
+				<div class="mb-8">
+					<h2 class="mb-3 text-lg font-semibold">Sentence length</h2>
+					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+						<div class="rounded-lg border border-border p-4">
+							<div class="text-sm text-muted-foreground">Min</div>
+							<div class="text-xl font-bold">{sentStats.min}</div>
+						</div>
+						<div class="rounded-lg border border-border p-4">
+							<div class="text-sm text-muted-foreground">Max</div>
+							<div class="text-xl font-bold">{sentStats.max}</div>
+						</div>
+						<div class="rounded-lg border border-border p-4">
+							<div class="text-sm text-muted-foreground">Mean</div>
+							<div class="text-xl font-bold">{sentStats.mean}</div>
+						</div>
+						<div class="rounded-lg border border-border p-4">
+							<div class="text-sm text-muted-foreground">Median</div>
+							<div class="text-xl font-bold">{sentStats.median}</div>
+						</div>
+					</div>
+				</div>
+			{/if}
+		{:else if allSentences.length === 0}
 			<EmptyState icon={FileText} title="No sentences yet" description="Upload a CoNLL-U file or add sentences manually.">
 				<div class="flex gap-2">
 					<Button variant="outline" size="sm" onclick={() => (showUpload = true)}>Upload CoNLL-U</Button>

@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.annotation import Annotation
+from app.models.annotation import Annotation, AnnotationStatus
 from app.models.sentence import Sentence
 from app.models.user import User
 from app.schemas.annotation import (
@@ -15,6 +15,17 @@ from app.schemas.annotation import (
     AnnotationUpdate,
 )
 from app.services.wordlines import copy_wordlines
+
+# Valid status transitions: {(from_status, to_status)}
+_ANNOTATOR_TRANSITIONS = {
+    (AnnotationStatus.NEW, AnnotationStatus.DRAFT),
+    (AnnotationStatus.DRAFT, AnnotationStatus.SUBMITTED),
+    (AnnotationStatus.REJECTED, AnnotationStatus.DRAFT),
+}
+_REVIEWER_TRANSITIONS = {
+    (AnnotationStatus.SUBMITTED, AnnotationStatus.APPROVED),
+    (AnnotationStatus.SUBMITTED, AnnotationStatus.REJECTED),
+}
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -58,6 +69,58 @@ async def create_annotation(
     await db.commit()
     await db.refresh(annotation)
     return annotation
+
+
+@router.post("/{annotation_id}/clone", response_model=AnnotationRead)
+async def clone_annotation(
+    annotation_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy wordlines from another annotation into the current user's annotation.
+
+    Finds the current user's annotation for the same sentence and replaces
+    its wordlines with copies from the source annotation.
+    """
+    # Load the source annotation with its wordlines
+    result = await db.execute(
+        select(Annotation)
+        .where(Annotation.id == annotation_id)
+        .options(selectinload(Annotation.wordlines))
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Source annotation not found")
+
+    # Find the current user's annotation for this sentence
+    target_result = await db.execute(
+        select(Annotation)
+        .where(
+            Annotation.sentence_id == source.sentence_id,
+            Annotation.annotator_id == current_user.id,
+            Annotation.is_template.is_(False),
+        )
+        .options(selectinload(Annotation.wordlines))
+    )
+    target = target_result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "You don't have an annotation for this sentence yet",
+        )
+
+    # Delete existing wordlines from target
+    for wl in target.wordlines:
+        await db.delete(wl)
+    await db.flush()
+
+    # Copy wordlines from source
+    if source.wordlines:
+        db.add_all(copy_wordlines(source.wordlines, target.id))
+
+    await db.commit()
+    await db.refresh(target)
+    return target
 
 
 @router.get(
@@ -170,12 +233,43 @@ async def update_annotation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Annotation).where(Annotation.id == annotation_id))
+    result = await db.execute(
+        select(Annotation)
+        .where(Annotation.id == annotation_id)
+        .options(selectinload(Annotation.sentence).selectinload(Sentence.treebank))
+    )
     annotation = result.scalar_one_or_none()
     if not annotation:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Annotation not found")
-    if annotation.annotator_id != current_user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your annotation")
+
+    # Validate status transitions
+    if body.status is not None and body.status != annotation.status:
+        old_status = AnnotationStatus(annotation.status)
+        new_status = AnnotationStatus(body.status)
+        transition = (old_status, new_status)
+        treebank = annotation.sentence.treebank
+
+        if transition in _REVIEWER_TRANSITIONS:
+            # Only the treebank creator can approve/reject
+            if current_user.id != treebank.created_by:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    "Only the treebank creator can approve or reject annotations",
+                )
+        elif transition in _ANNOTATOR_TRANSITIONS:
+            # Only the annotator can make annotator transitions
+            if annotation.annotator_id != current_user.id:
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your annotation")
+        else:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"Invalid status transition from {old_status.name} to {new_status.name}",
+            )
+    elif annotation.annotator_id != current_user.id:
+        # For non-status updates, only the annotator can edit
+        treebank = annotation.sentence.treebank
+        if current_user.id != treebank.created_by:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your annotation")
 
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -265,5 +359,6 @@ def _build_annotation_detail(a: Annotation) -> AnnotationDetail:
         sentence_metadata=a.sentence.metadata_,
         treebank_title=a.sentence.treebank.title,
         treebank_id=a.sentence.treebank.id,
+        treebank_created_by=a.sentence.treebank.created_by,
         sentence_order=a.sentence.order,
     )

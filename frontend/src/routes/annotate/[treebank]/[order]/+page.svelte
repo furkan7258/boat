@@ -2,8 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { getAnnotationByPosition, updateAnnotation, updateWordlines } from '$api/annotations';
-	import { listSentences } from '$api/sentences';
+	import { getAnnotationByPosition, updateAnnotation, updateWordlines, cloneAnnotation } from '$api/annotations';
+	import { listSentences, listSentenceAnnotations } from '$api/sentences';
 	import { getTreebankByTitle } from '$api/treebanks';
 	import { ApiError } from '$api/client';
 	import {
@@ -35,8 +35,10 @@
 	import KeyboardShortcutsModal from '$components/common/KeyboardShortcutsModal.svelte';
 	import ErrorState from '$components/common/ErrorState.svelte';
 	import { toast } from '$stores/toast';
-	import type { TreebankRead, ValidationProfileRead } from '$api/types';
+	import { user } from '$stores/auth';
+	import type { TreebankRead, ValidationProfileRead, AnnotationRead } from '$api/types';
 	import { getValidationProfile } from '$api/validation';
+	import { validateAll, errorCount } from '$utils/validation';
 
 	const treebankSlug = $derived(decodeURIComponent(page.params.treebank!));
 	const order = $derived(Number(page.params.order!));
@@ -51,8 +53,16 @@
 	let showComments = $state(false);
 	let showGraph = $state(true);
 
+	// Other users' annotations available for cloning
+	let otherAnnotations = $state<AnnotationRead[]>([]);
+	let cloning = $state(false);
+
 	// Token count for auto-hiding graph on long sentences
 	const tokenCount = $derived($cells.filter((c) => !c.id_f.includes('-') && !c.id_f.includes('.')).length);
+
+	// Real-time validation errors (recomputes on every cell edit)
+	const validationErrors = $derived(validateAll($cells));
+	const validationErrorCount = $derived(errorCount(validationErrors));
 
 	// Click-to-set-HEAD mode
 	let selectedTokenId = $state<string | null>(null);
@@ -172,6 +182,18 @@
 				toast.info('Unsaved changes recovered');
 			}
 
+			// Fetch other users' annotations for cloning (web mode only)
+			if (!offline) {
+				try {
+					const allAnnotations = await listSentenceAnnotations(detail.sentence_id);
+					otherAnnotations = allAnnotations.filter(
+						(a) => !a.is_template && a.annotator_id !== $user?.id
+					);
+				} catch {
+					otherAnnotations = [];
+				}
+			}
+
 			// Fetch validation profile (gracefully handle 404)
 			try {
 				validationProfile = await getValidationProfile(tb.id);
@@ -227,6 +249,22 @@
 		}
 	}
 
+	async function changeStatus(newStatus: number) {
+		if ($isSaving || !$annotationId || !treebank) return;
+		isSaving.set(true);
+		try {
+			await updateAnnotation($annotationId, { status: newStatus });
+			const detail = await getAnnotationByPosition(treebank.id, order);
+			loadAnnotation(detail);
+			toast.success('Status updated');
+		} catch (err) {
+			const msg = err instanceof ApiError ? err.detail : 'Failed to update status';
+			toast.error(msg);
+		} finally {
+			isSaving.set(false);
+		}
+	}
+
 	async function goPrev() {
 		if (loading) return;
 		if (order <= 1) return;
@@ -241,6 +279,25 @@
 		if ($isDirty && !confirm('You have unsaved changes. Continue?')) return;
 		await goto(`/annotate/${treebankSlug}/${order + 1}`);
 		await loadPage();
+	}
+
+	async function handleClone(sourceAnnotationId: number) {
+		if (cloning || !treebank) return;
+		if ($isDirty && !confirm('You have unsaved changes that will be lost. Continue?')) return;
+		cloning = true;
+		try {
+			await cloneAnnotation(sourceAnnotationId);
+			// Reload the page to pick up the cloned wordlines
+			const detail = await getAnnotationByPosition(treebank.id, order);
+			loadAnnotation(detail);
+			clearDraft(detail.id);
+			toast.success('Annotation cloned');
+		} catch (err) {
+			const msg = err instanceof ApiError ? err.detail : 'Failed to clone annotation';
+			toast.error(msg);
+		} finally {
+			cloning = false;
+		}
 	}
 
 	function handleColumnsChange(cols: string[]) {
@@ -363,6 +420,18 @@
 					{/each}
 				</div>
 			{/if}
+			{#if otherAnnotations.length > 0}
+				<div class="mt-2 flex items-center gap-2 text-xs">
+					<span class="text-muted-foreground">Clone from:</span>
+					{#each otherAnnotations as anno}
+						<button
+							onclick={() => handleClone(anno.id)}
+							disabled={cloning}
+							class="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+						>{anno.annotator_username ?? `user #${anno.annotator_id}`}</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Main content -->
@@ -373,6 +442,7 @@
 					<AnnotationToolbar
 						bind:visibleColumns
 						onsave={save}
+						onstatuschange={changeStatus}
 						onnext={goNext}
 						onprev={goPrev}
 						oncolumnschange={handleColumnsChange}
@@ -380,6 +450,23 @@
 						hasNext={order < maxOrder}
 						{loading}
 					/>
+					{#if validationErrorCount > 0}
+						<button
+							onclick={() => {
+								const firstKey = validationErrors.keys().next().value;
+								if (firstKey) {
+									const tokenId = firstKey.split(':')[0];
+									const el = document.querySelector('[aria-label*="token ' + tokenId + '"]');
+									el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+								}
+							}}
+							class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 cursor-pointer transition-colors"
+							title="Click to scroll to first error"
+						>
+							<span class="inline-block h-1.5 w-1.5 rounded-full bg-destructive"></span>
+							{validationErrorCount} {validationErrorCount === 1 ? 'error' : 'errors'}
+						</button>
+					{/if}
 				</div>
 
 				<div class="flex-1 overflow-auto px-3 pb-3">
@@ -391,6 +478,7 @@
 								{selectedTokenId}
 								{headSelectionMode}
 								onTokenClick={handleGraphTokenClick}
+								exportFilename={`${treebankSlug}_${$sentId}`}
 							/>
 						</div>
 					{:else if tokenCount >= 50}
@@ -408,6 +496,7 @@
 						{visibleColumns}
 						{selectedTokenId}
 						{validationProfile}
+						{validationErrors}
 						onTokenSelect={handleTokenSelect}
 					/>
 				</div>

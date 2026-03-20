@@ -33,6 +33,13 @@ async def batch_update_wordlines(
     if annotation.annotator_id != current_user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your annotation")
 
+    # Prevent editing wordlines for submitted or approved annotations
+    if annotation.status in (AnnotationStatus.SUBMITTED, AnnotationStatus.APPROVED):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Cannot edit wordlines for a submitted or approved annotation",
+        )
+
     # Delete existing wordlines
     await db.execute(delete(WordLine).where(WordLine.annotation_id == annotation_id))
 
@@ -45,6 +52,7 @@ async def batch_update_wordlines(
         new_wordlines.append(wl)
 
     # Auto-compute status by comparing to template
+
     template_result = await db.execute(
         select(Annotation)
         .where(
@@ -77,10 +85,10 @@ async def batch_update_wordlines(
         ]
         new_fields = [_wl_fields(wl) for wl in sorted(new_wordlines, key=lambda w: w.id_f)]
         annotation.status = (
-            AnnotationStatus.COMPLETE if new_fields != template_fields else AnnotationStatus.NEW
+            AnnotationStatus.DRAFT if new_fields != template_fields else AnnotationStatus.NEW
         )
     else:
-        annotation.status = AnnotationStatus.COMPLETE
+        annotation.status = AnnotationStatus.DRAFT
 
     await db.commit()
 

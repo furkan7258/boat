@@ -9,7 +9,9 @@ from app.models.base import Base, TimestampMixin
 class AnnotationStatus(enum.IntEnum):
     NEW = 0
     DRAFT = 1
-    COMPLETE = 2
+    SUBMITTED = 2
+    APPROVED = 3
+    REJECTED = 4
 
 
 class Annotation(Base, TimestampMixin):

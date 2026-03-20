@@ -123,11 +123,26 @@ async def list_sentence_annotations(
     stmt = (
         select(Annotation)
         .where(Annotation.sentence_id == sentence_id)
+        .options(selectinload(Annotation.annotator))
         .limit(limit)
         .offset(offset)
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    annotations = result.scalars().all()
+    return [
+        AnnotationRead(
+            id=a.id,
+            annotator_id=a.annotator_id,
+            sentence_id=a.sentence_id,
+            notes=a.notes,
+            status=a.status,
+            is_template=a.is_template,
+            is_gold=a.is_gold,
+            created_at=a.created_at,
+            annotator_username=a.annotator.username,
+        )
+        for a in annotations
+    ]
 
 
 @router.get("/{sentence_id}/diff")

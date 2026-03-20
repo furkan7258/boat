@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { status, isDirty, canUndo, canRedo, isSaving, undo, redo, resetToInitial, notes } from '$stores/annotation';
+	import { status, isDirty, canUndo, canRedo, isSaving, undo, redo, resetToInitial, notes, treebankCreatedBy, annotatorId } from '$stores/annotation';
+	import { user } from '$stores/auth';
+	import { AnnotationStatus } from '$api/types';
 	import StatusBadge from '$components/common/StatusBadge.svelte';
 	import Button from '$components/common/Button.svelte';
 	import Tooltip from '$components/common/Tooltip.svelte';
@@ -8,6 +10,7 @@
 		visibleColumns: string[];
 		oncolumnschange: (cols: string[]) => void;
 		onsave: () => void;
+		onstatuschange: (newStatus: number) => void;
 		onnext: () => void;
 		onprev: () => void;
 		hasPrev: boolean;
@@ -15,11 +18,21 @@
 		loading?: boolean;
 	}
 
-	let { visibleColumns = $bindable(), oncolumnschange, onsave, onnext, onprev, hasPrev, hasNext, loading = false }: Props = $props();
+	let { visibleColumns = $bindable(), oncolumnschange, onsave, onstatuschange, onnext, onprev, hasPrev, hasNext, loading = false }: Props = $props();
 
 	const allColumns = ['ID', 'FORM', 'LEMMA', 'UPOS', 'XPOS', 'FEATS', 'HEAD', 'DEPREL', 'DEPS', 'MISC'];
 
 	let showNotes = $state(false);
+
+	const isOwner = $derived($user?.id === $annotatorId);
+	const isReviewer = $derived($user?.id === $treebankCreatedBy);
+
+	// Annotator workflow buttons
+	const canSubmit = $derived(isOwner && $status === AnnotationStatus.DRAFT);
+	const canRevise = $derived(isOwner && $status === AnnotationStatus.REJECTED);
+
+	// Reviewer workflow buttons
+	const canApproveReject = $derived(isReviewer && $status === AnnotationStatus.SUBMITTED);
 
 	function toggleColumn(col: string) {
 		if (col === 'ID' || col === 'FORM') return; // Always visible
@@ -64,6 +77,58 @@
 
 		<div class="flex items-center gap-3">
 			<StatusBadge status={$status} />
+
+			<!-- Workflow buttons -->
+			{#if canSubmit}
+				<Tooltip text="Submit annotation for review">
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => onstatuschange(AnnotationStatus.SUBMITTED)}
+						disabled={$isSaving || $isDirty}
+					>
+						Submit for Review
+					</Button>
+				</Tooltip>
+			{/if}
+
+			{#if canRevise}
+				<Tooltip text="Revise rejected annotation">
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => onstatuschange(AnnotationStatus.DRAFT)}
+						disabled={$isSaving}
+					>
+						Revise
+					</Button>
+				</Tooltip>
+			{/if}
+
+			{#if canApproveReject}
+				<Tooltip text="Approve this annotation">
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => onstatuschange(AnnotationStatus.APPROVED)}
+						disabled={$isSaving}
+						class="border-success/50 text-success hover:bg-success/10"
+					>
+						Approve
+					</Button>
+				</Tooltip>
+				<Tooltip text="Reject this annotation">
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => onstatuschange(AnnotationStatus.REJECTED)}
+						disabled={$isSaving}
+						class="border-destructive/50 text-destructive hover:bg-destructive/10"
+					>
+						Reject
+					</Button>
+				</Tooltip>
+			{/if}
 
 			<Tooltip text="Save annotation (Alt+S)">
 				<Button

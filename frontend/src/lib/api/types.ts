@@ -25,6 +25,7 @@ export interface TreebankRead {
 	id: number;
 	title: string;
 	language: string;
+	created_by: number | null;
 	created_at: string;
 }
 
@@ -68,15 +69,27 @@ export interface WordLineRead {
 }
 
 // Annotation
+export const AnnotationStatus = {
+	NEW: 0,
+	DRAFT: 1,
+	SUBMITTED: 2,
+	APPROVED: 3,
+	REJECTED: 4
+} as const;
+
+export type AnnotationStatusValue = (typeof AnnotationStatus)[keyof typeof AnnotationStatus];
+
 export interface AnnotationRead {
 	id: number;
 	sentence_id: number;
 	annotator_id: number;
 	status: number;
+	status_label: string;
 	is_template: boolean;
 	is_gold: boolean;
 	notes: string;
 	created_at: string;
+	annotator_username: string | null;
 }
 
 export interface AnnotationDetail extends AnnotationRead {
@@ -87,6 +100,7 @@ export interface AnnotationDetail extends AnnotationRead {
 	sentence_metadata: Record<string, string> | null;
 	treebank_title: string | null;
 	treebank_id: number | null;
+	treebank_created_by: number | null;
 	sentence_order: number | null;
 }
 
@@ -159,6 +173,16 @@ export interface ValidationProfileRead {
 	feature_order: string[] | null;
 	custom_rules: Record<string, unknown>[] | null;
 	created_at: string;
+}
+
+// Statistics
+export interface TreebankStats {
+	upos_distribution: Record<string, number>;
+	deprel_distribution: Record<string, number>;
+	top_lemmas: { lemma: string; count: number }[];
+	sentence_lengths: number[];
+	total_tokens: number;
+	total_sentences: number;
 }
 
 // Agreement

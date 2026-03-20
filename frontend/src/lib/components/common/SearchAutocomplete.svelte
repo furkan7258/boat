@@ -1,20 +1,19 @@
 <script lang="ts">
 	interface Props {
 		value: string;
-		options: readonly string[];
+		options: readonly string[] | string[];
 		onchange: (value: string) => void;
+		placeholder?: string;
 		class?: string;
-		title?: string;
 	}
 
-	let { value, options, onchange, class: className = '', title: titleAttr = undefined }: Props = $props();
+	let { value, options, onchange, placeholder = '', class: className = '' }: Props = $props();
 
 	let open = $state(false);
 	let filter = $state('');
 	let inputEl: HTMLInputElement | undefined = $state();
 	let highlightIdx = $state(0);
 
-	// Sync filter with external value changes when dropdown is closed
 	$effect(() => {
 		if (!open) filter = value;
 	});
@@ -32,7 +31,6 @@
 	}
 
 	function handleBlur() {
-		// Delay to allow click on option
 		setTimeout(() => {
 			open = false;
 			filter = value;
@@ -60,8 +58,8 @@
 			e.preventDefault();
 			highlightIdx = Math.max(highlightIdx - 1, 0);
 		} else if (e.key === 'Enter') {
-			e.preventDefault();
-			if (filtered.length > 0) {
+			if (open && filtered.length > 0) {
+				e.preventDefault();
 				selectOption(filtered[highlightIdx]);
 			}
 		} else if (e.key === 'Escape') {
@@ -76,7 +74,7 @@
 	}
 </script>
 
-<td class="border-r border-border px-0.5 py-0.5 relative" title={titleAttr}>
+<div class="relative {className}">
 	<input
 		bind:this={inputEl}
 		value={open ? filter : value}
@@ -84,15 +82,16 @@
 		onblur={handleBlur}
 		oninput={handleInput}
 		onkeydown={handleKeydown}
-		class="w-full min-w-[3rem] rounded px-1 py-0.5 text-xs outline-none focus:ring-2 focus:ring-ring bg-transparent {className}"
+		{placeholder}
+		class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 	/>
 	{#if open && filtered.length > 0}
-		<div class="absolute left-0 top-full z-50 mt-0.5 max-h-40 w-max min-w-full overflow-auto rounded-md border border-border bg-background shadow-lg">
+		<div class="absolute left-0 top-full z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background shadow-lg">
 			{#each filtered as opt, i}
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class="cursor-pointer px-2 py-1 text-xs {i === highlightIdx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
+					class="cursor-pointer px-3 py-1.5 text-sm {i === highlightIdx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
 					onmousedown={() => selectOption(opt)}
 				>
 					{opt}
@@ -100,4 +99,4 @@
 			{/each}
 		</div>
 	{/if}
-</td>
+</div>

@@ -5,19 +5,32 @@
 	import type { SearchResult, SearchResponse, TreebankWithProgress } from '$api/types';
 	import Button from '$components/common/Button.svelte';
 	import Input from '$components/common/Input.svelte';
+	import SearchAutocomplete from '$components/common/SearchAutocomplete.svelte';
+	import { UPOS_TAGS, DEPREL_TAGS, FEATURES, DEFAULT_MISC } from '$utils/ud-tagsets';
 
 	const FIELD_OPTIONS = [
 		'sent_id', 'text', 'form', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc'
 	];
 
+	const FEATURE_KEYS = Object.keys(FEATURES);
+	const MISC_KEYS = Object.keys(DEFAULT_MISC);
+
 	interface QueryRow {
 		field: string;
 		value: string;
+		featKey: string;
+		featValue: string;
+		miscKey: string;
+		miscValue: string;
+	}
+
+	function makeRow(field = 'upos'): QueryRow {
+		return { field, value: '', featKey: '', featValue: '', miscKey: '', miscValue: '' };
 	}
 
 	let treebanks = $state<TreebankWithProgress[]>([]);
 	let selectedTreebank = $state('');
-	let queries = $state<QueryRow[]>([{ field: 'upos', value: '' }]);
+	let queries = $state<QueryRow[]>([makeRow('upos')]);
 	let results = $state<SearchResult[]>([]);
 	let total = $state(0);
 	let searched = $state(false);
@@ -30,20 +43,39 @@
 	});
 
 	function addRow() {
-		queries = [...queries, { field: 'form', value: '' }];
+		queries = [...queries, makeRow('form')];
 	}
 
 	function removeRow(index: number) {
 		queries = queries.filter((_, i) => i !== index);
 	}
 
+	/** Resolve the effective search value for a query row */
+	function resolveValue(q: QueryRow): string {
+		if (q.field === 'feats') {
+			if (q.featKey && q.featValue) return `${q.featKey}=${q.featValue}`;
+			if (q.featKey) return q.featKey;
+			return '';
+		}
+		if (q.field === 'misc') {
+			if (q.miscKey && q.miscValue) return `${q.miscKey}=${q.miscValue}`;
+			if (q.miscKey) return q.miscKey;
+			return '';
+		}
+		return q.value;
+	}
+
+	function buildActiveQueries(): SearchQuery[] {
+		return queries
+			.map((q) => ({ field: q.field, value: resolveValue(q).trim() }))
+			.filter((q) => q.value);
+	}
+
 	async function handleSearch(e?: SubmitEvent) {
 		e?.preventDefault();
 		loading = true;
 		currentPage = 0;
-		const activeQueries: SearchQuery[] = queries
-			.filter((q) => q.value.trim())
-			.map((q) => ({ field: q.field, value: q.value.trim() }));
+		const activeQueries = buildActiveQueries();
 		const response = await search(activeQueries, selectedTreebank || undefined, 0, pageSize);
 		results = response.results;
 		total = response.total;
@@ -54,13 +86,25 @@
 	async function goPage(p: number) {
 		currentPage = p;
 		loading = true;
-		const activeQueries: SearchQuery[] = queries
-			.filter((q) => q.value.trim())
-			.map((q) => ({ field: q.field, value: q.value.trim() }));
+		const activeQueries = buildActiveQueries();
 		const response = await search(activeQueries, selectedTreebank || undefined, p * pageSize, pageSize);
 		results = response.results;
 		total = response.total;
 		loading = false;
+	}
+
+	/** Reset sub-field state when the main field changes */
+	function handleFieldChange(index: number, newField: string) {
+		queries[index].field = newField;
+		queries[index].value = '';
+		queries[index].featKey = '';
+		queries[index].featValue = '';
+		queries[index].miscKey = '';
+		queries[index].miscValue = '';
+	}
+
+	function getMiscValueOptions(key: string): string[] | null {
+		return DEFAULT_MISC[key] ?? null;
 	}
 </script>
 
@@ -87,14 +131,75 @@
 		{#each queries as q, i}
 			<div class="flex items-center gap-2">
 				<select
-					bind:value={q.field}
+					value={q.field}
+					onchange={(e) => handleFieldChange(i, (e.target as HTMLSelectElement).value)}
 					class="flex h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
 				>
 					{#each FIELD_OPTIONS as opt}
 						<option value={opt}>{opt.toUpperCase()}</option>
 					{/each}
 				</select>
-				<Input bind:value={q.value} placeholder="Search value..." class="flex-1" />
+
+				{#if q.field === 'upos'}
+					<SearchAutocomplete
+						value={q.value}
+						options={UPOS_TAGS}
+						onchange={(v) => { q.value = v; }}
+						placeholder="Select UPOS tag..."
+						class="flex-1"
+					/>
+				{:else if q.field === 'deprel'}
+					<SearchAutocomplete
+						value={q.value}
+						options={DEPREL_TAGS}
+						onchange={(v) => { q.value = v; }}
+						placeholder="Select dependency relation..."
+						class="flex-1"
+					/>
+				{:else if q.field === 'feats'}
+					<SearchAutocomplete
+						value={q.featKey}
+						options={FEATURE_KEYS}
+						onchange={(v) => { q.featKey = v; q.featValue = ''; }}
+						placeholder="Feature name..."
+						class="flex-1"
+					/>
+					<span class="text-muted-foreground">=</span>
+					<SearchAutocomplete
+						value={q.featValue}
+						options={q.featKey && FEATURES[q.featKey] ? FEATURES[q.featKey] : []}
+						onchange={(v) => { q.featValue = v; }}
+						placeholder={q.featKey ? 'Feature value...' : 'Select a feature first'}
+						class="flex-1"
+					/>
+				{:else if q.field === 'misc'}
+					<SearchAutocomplete
+						value={q.miscKey}
+						options={MISC_KEYS}
+						onchange={(v) => { q.miscKey = v; q.miscValue = ''; }}
+						placeholder="MISC key..."
+						class="flex-1"
+					/>
+					<span class="text-muted-foreground">=</span>
+					{#if q.miscKey && getMiscValueOptions(q.miscKey)}
+						<SearchAutocomplete
+							value={q.miscValue}
+							options={getMiscValueOptions(q.miscKey) ?? []}
+							onchange={(v) => { q.miscValue = v; }}
+							placeholder="MISC value..."
+							class="flex-1"
+						/>
+					{:else}
+						<Input
+							bind:value={q.miscValue}
+							placeholder={q.miscKey ? 'Value...' : 'Select a key first'}
+							class="flex-1"
+						/>
+					{/if}
+				{:else}
+					<Input bind:value={q.value} placeholder="Search value..." class="flex-1" />
+				{/if}
+
 				{#if queries.length > 1}
 					<button onclick={() => removeRow(i)} class="text-muted-foreground hover:text-destructive cursor-pointer">&times;</button>
 				{/if}

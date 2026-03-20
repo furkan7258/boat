@@ -42,11 +42,20 @@ class AnnotationRead(BaseModel):
     sentence_id: int
     notes: str
     status: int
+    status_label: str = ""
     is_template: bool
     is_gold: bool
     created_at: datetime
+    annotator_username: str | None = None
 
     model_config = {"from_attributes": True}
+
+    def model_post_init(self, __context: object) -> None:
+        if not self.status_label:
+            try:
+                self.status_label = AnnotationStatus(self.status).name
+            except ValueError:
+                self.status_label = "UNKNOWN"
 
 
 class AnnotationDetail(AnnotationRead):
@@ -57,4 +66,5 @@ class AnnotationDetail(AnnotationRead):
     sentence_metadata: dict | None = None
     treebank_title: str | None = None
     treebank_id: int | None = None
+    treebank_created_by: int | None = None
     sentence_order: int | None = None

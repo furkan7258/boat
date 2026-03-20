@@ -181,7 +181,7 @@ Health check: `GET /health` (no /api prefix).
 - **Async SQLAlchemy**: All DB access uses `AsyncSession` via `get_db` dependency.
 - **JWT auth**: `get_current_user` dependency extracts user from Bearer token.
 - **CoNLL-U**: 10-column tab-separated format for linguistic annotations. Fields: ID, FORM, LEMMA, UPOS, XPOS, FEATS, HEAD, DEPREL, DEPS, MISC.
-- **AnnotationStatus**: IntEnum — 0=NEW, 1=DRAFT, 2=COMPLETE.
+- **AnnotationStatus**: IntEnum — 0=NEW, 1=DRAFT, 2=SUBMITTED, 3=APPROVED, 4=REJECTED.
 - **Template annotations**: `is_template=True` annotations hold the original CoNLL-U data. User annotations are copies.
 - **Batch wordline update**: `PUT /annotations/{id}/wordlines` replaces all wordlines in one request.
 

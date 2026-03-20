@@ -75,13 +75,14 @@ async def test_update_annotation_status(client, auth_headers, treebank_with_sent
     )
     anno_id = create_resp.json()["id"]
 
+    # Transition NEW -> DRAFT
     response = await client.patch(
         f"/api/annotations/{anno_id}",
         headers=auth_headers,
-        json={"status": 2, "notes": "Done"},
+        json={"status": 1, "notes": "Done"},
     )
     assert response.status_code == 200
-    assert response.json()["status"] == 2
+    assert response.json()["status"] == 1
     assert response.json()["notes"] == "Done"
 
 

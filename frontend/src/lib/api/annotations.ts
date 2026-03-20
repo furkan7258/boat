@@ -5,6 +5,10 @@ export function createAnnotation(sentenceId: number) {
 	return api.post<AnnotationRead>('/annotations', { sentence_id: sentenceId });
 }
 
+export function cloneAnnotation(annotationId: number) {
+	return api.post<AnnotationRead>(`/annotations/${annotationId}/clone`);
+}
+
 export function getAnnotation(id: number) {
 	return api.get<AnnotationDetail>(`/annotations/${id}`);
 }

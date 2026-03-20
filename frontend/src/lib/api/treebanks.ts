@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { api, getBaseUrl, TOKEN_KEY } from './client';
 import { appMode } from '$stores/mode';
-import type { TreebankRead, TreebankWithProgress, AgreementResponse } from './types';
+import type { TreebankRead, TreebankWithProgress, AgreementResponse, TreebankStats } from './types';
 
 export function listTreebanks() {
 	return api.get<TreebankWithProgress[]>('/treebanks');
@@ -50,6 +50,10 @@ export async function exportConllu(id: number) {
 	a.download = `treebank-${id}.conllu`;
 	a.click();
 	URL.revokeObjectURL(url);
+}
+
+export function getTreebankStats(id: number) {
+	return api.get<TreebankStats>(`/treebanks/${id}/stats`);
 }
 
 export function getAgreement(id: number) {

@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from enum import StrEnum
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import case
@@ -35,6 +35,7 @@ class ExportFormat(StrEnum):
     conllu = "conllu"
     json = "json"
 
+
 router = APIRouter(prefix="/treebanks", tags=["treebanks"])
 
 
@@ -52,7 +53,20 @@ async def list_treebanks(
             func.count(func.distinct(Sentence.id)).label("sentence_count"),
             func.count(Annotation.id).label("annotation_count"),
             func.coalesce(
-                func.sum(case((Annotation.status == AnnotationStatus.COMPLETE, 1), else_=0)),
+                func.sum(
+                    case(
+                        (
+                            Annotation.status.in_(
+                                [
+                                    AnnotationStatus.SUBMITTED,
+                                    AnnotationStatus.APPROVED,
+                                ]
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
                 0,
             ).label("complete_count"),
         )
@@ -71,6 +85,7 @@ async def list_treebanks(
             id=tb.id,
             title=tb.title,
             language=tb.language,
+            created_by=tb.created_by,
             created_at=tb.created_at,
             sentence_count=sent_count or 0,
             annotation_count=anno_count or 0,
@@ -141,6 +156,103 @@ async def get_treebank(
     return treebank
 
 
+@router.get("/{treebank_id}/stats")
+async def treebank_stats(
+    treebank_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    """Corpus statistics for a treebank (based on template annotations)."""
+    # Verify treebank exists
+    result = await db.execute(select(Treebank).where(Treebank.id == treebank_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
+
+    # UPOS distribution
+    upos_stmt = (
+        select(WordLine.upos, func.count().label("cnt"))
+        .join(Annotation, Annotation.id == WordLine.annotation_id)
+        .join(Sentence, Sentence.id == Annotation.sentence_id)
+        .where(
+            Sentence.treebank_id == treebank_id,
+            Annotation.is_template.is_(True),
+            ~WordLine.id_f.contains("."),
+            ~WordLine.id_f.contains("-"),
+        )
+        .group_by(WordLine.upos)
+        .order_by(desc("cnt"))
+    )
+    upos_rows = (await db.execute(upos_stmt)).all()
+    upos_distribution = {tag: count for tag, count in upos_rows if tag != "_"}
+
+    # DEPREL distribution
+    deprel_stmt = (
+        select(WordLine.deprel, func.count().label("cnt"))
+        .join(Annotation, Annotation.id == WordLine.annotation_id)
+        .join(Sentence, Sentence.id == Annotation.sentence_id)
+        .where(
+            Sentence.treebank_id == treebank_id,
+            Annotation.is_template.is_(True),
+            ~WordLine.id_f.contains("."),
+            ~WordLine.id_f.contains("-"),
+        )
+        .group_by(WordLine.deprel)
+        .order_by(desc("cnt"))
+    )
+    deprel_rows = (await db.execute(deprel_stmt)).all()
+    deprel_distribution = {rel: count for rel, count in deprel_rows if rel != "_"}
+
+    # Top 20 lemmas
+    lemma_stmt = (
+        select(WordLine.lemma, func.count().label("cnt"))
+        .join(Annotation, Annotation.id == WordLine.annotation_id)
+        .join(Sentence, Sentence.id == Annotation.sentence_id)
+        .where(
+            Sentence.treebank_id == treebank_id,
+            Annotation.is_template.is_(True),
+            ~WordLine.id_f.contains("."),
+            ~WordLine.id_f.contains("-"),
+            WordLine.lemma != "_",
+        )
+        .group_by(WordLine.lemma)
+        .order_by(desc("cnt"))
+        .limit(20)
+    )
+    lemma_rows = (await db.execute(lemma_stmt)).all()
+    top_lemmas = [{"lemma": lemma, "count": count} for lemma, count in lemma_rows]
+
+    # Sentence lengths (token count per sentence, excluding MWTs and empty nodes)
+    sent_len_stmt = (
+        select(func.count(WordLine.id).label("token_count"))
+        .join(Annotation, Annotation.id == WordLine.annotation_id)
+        .join(Sentence, Sentence.id == Annotation.sentence_id)
+        .where(
+            Sentence.treebank_id == treebank_id,
+            Annotation.is_template.is_(True),
+            ~WordLine.id_f.contains("."),
+            ~WordLine.id_f.contains("-"),
+        )
+        .group_by(Sentence.id)
+    )
+    sent_len_rows = (await db.execute(sent_len_stmt)).all()
+    sentence_lengths = [row.token_count for row in sent_len_rows]
+
+    # Total tokens
+    total_tokens = sum(upos_distribution.values()) if upos_distribution else 0
+
+    # Total sentences
+    total_sentences = len(sentence_lengths)
+
+    return {
+        "upos_distribution": upos_distribution,
+        "deprel_distribution": deprel_distribution,
+        "top_lemmas": top_lemmas,
+        "sentence_lengths": sentence_lengths,
+        "total_tokens": total_tokens,
+        "total_sentences": total_sentences,
+    }
+
+
 @router.delete("/{treebank_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_treebank(
     treebank_id: int,
@@ -152,9 +264,7 @@ async def delete_treebank(
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
     if current_user.id != treebank.created_by:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Not authorized to perform this action"
-        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to perform this action")
     await db.delete(treebank)
     await db.commit()
 
@@ -183,9 +293,7 @@ async def upload_conllu(
     if not treebank:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Treebank not found")
     if current_user.id != treebank.created_by:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Not authorized to perform this action"
-        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to perform this action")
 
     max_size = 10 * 1024 * 1024  # 10 MB
     raw = await file.read()
@@ -345,9 +453,7 @@ async def export_treebank(
         matching = [
             a
             for a in sent.annotations
-            if _annotation_matches(
-                a, annotator_id=annotator_id, current_user_id=current_user.id
-            )
+            if _annotation_matches(a, annotator_id=annotator_id, current_user_id=current_user.id)
         ]
         for anno in matching:
             if not anno.wordlines:
@@ -417,15 +523,17 @@ async def treebank_agreement(
     for sentence_id, anno_id, id_f, form, lemma, upos, feats, head, deprel in rows:
         annos = sentence_annos.setdefault(sentence_id, {})
         wl_list = annos.setdefault(anno_id, [])
-        wl_list.append({
-            "id_f": id_f,
-            "form": form,
-            "lemma": lemma,
-            "upos": upos,
-            "feats": feats,
-            "head": head,
-            "deprel": deprel,
-        })
+        wl_list.append(
+            {
+                "id_f": id_f,
+                "form": form,
+                "lemma": lemma,
+                "upos": upos,
+                "feats": feats,
+                "head": head,
+                "deprel": deprel,
+            }
+        )
 
     agreement_sum = 0.0
     scored_count = 0

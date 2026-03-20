@@ -54,6 +54,8 @@ export const status = writable(0);
 export const notes = writable('');
 export const isGold = writable(false);
 export const isSaving = writable(false);
+export const treebankCreatedBy = writable<number | null>(null);
+export const annotatorId = writable<number | null>(null);
 
 // Edit history
 export const editHistory = writable<Edit[]>([]);
@@ -84,6 +86,8 @@ export function loadAnnotation(detail: AnnotationDetail) {
 	status.set(detail.status);
 	notes.set(detail.notes ?? '');
 	isGold.set(detail.is_gold);
+	treebankCreatedBy.set(detail.treebank_created_by ?? null);
+	annotatorId.set(detail.annotator_id);
 	editHistory.set([]);
 	redoStack.set([]);
 	isSaving.set(false);

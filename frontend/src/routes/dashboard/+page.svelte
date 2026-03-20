@@ -3,6 +3,7 @@
 	import { user } from '$stores/auth';
 	import { listTreebanks } from '$api/treebanks';
 	import { getMyAnnotations } from '$api/annotations';
+	import { AnnotationStatus } from '$api/types';
 	import type { TreebankWithProgress, AnnotationDetail } from '$api/types';
 	import StatusBadge from '$components/common/StatusBadge.svelte';
 	import Skeleton from '$components/common/Skeleton.svelte';
@@ -22,8 +23,8 @@
 		treebanks = tb;
 		allAnnotations = ann;
 		totalAnnotations = ann.length;
-		completedCount = ann.filter((a) => a.status === 2).length;
-		lastDraft = ann.find((a) => a.status === 1) ?? null;
+		completedCount = ann.filter((a) => a.status === AnnotationStatus.SUBMITTED || a.status === AnnotationStatus.APPROVED).length;
+		lastDraft = ann.find((a) => a.status === AnnotationStatus.DRAFT) ?? null;
 		recentAnnotations = ann.slice(0, 5);
 		loading = false;
 	});

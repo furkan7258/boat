@@ -12,6 +12,7 @@ class TreebankRead(BaseModel):
     id: int
     title: str
     language: str
+    created_by: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

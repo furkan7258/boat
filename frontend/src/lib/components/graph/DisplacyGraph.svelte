@@ -1,19 +1,22 @@
 <script lang="ts">
 	import { cells, updateCell, type Cell, type CellField } from '$stores/annotation';
 	import { toast } from '$stores/toast';
+	import { Download, Image } from 'lucide-svelte';
 
 	interface Props {
 		visibleColumns: string[];
 		selectedTokenId?: string | null;
 		onTokenClick?: (tokenId: string) => void;
 		headSelectionMode?: boolean;
+		exportFilename?: string;
 	}
 
 	let {
 		visibleColumns,
 		selectedTokenId = null,
 		onTokenClick,
-		headSelectionMode = false
+		headSelectionMode = false,
+		exportFilename = 'dependency-tree'
 	}: Props = $props();
 
 	// Layout constants
@@ -186,18 +189,102 @@
 		onTokenClick?.(tokenId);
 	}
 
-	function handleExportSvg() {
-		const svgEl = document.getElementById('dep-graph-svg');
-		if (!svgEl) return;
-		const serializer = new XMLSerializer();
-		const svgString = serializer.serializeToString(svgEl);
-		const blob = new Blob([svgString], { type: 'image/svg+xml' });
-		const url = URL.createObjectURL(blob);
+	function cloneSvgForExport(): SVGSVGElement | null {
+		const svgEl = document.getElementById('dep-graph-svg') as SVGSVGElement | null;
+		if (!svgEl) return null;
+
+		const clone = svgEl.cloneNode(true) as SVGSVGElement;
+
+		// Detect dark mode
+		const isDark = document.documentElement.classList.contains('dark');
+		const bgColor = isDark ? '#0a0a0a' : '#ffffff';
+		const textColor = isDark ? '#fafafa' : '#0a0a0a';
+
+		// Inline computed styles on all elements (before inserting bgRect to keep indices aligned)
+		const srcElements = svgEl.querySelectorAll('*');
+		const cloneElements = clone.querySelectorAll('*');
+		const styleProps = ['fill', 'stroke', 'stroke-width', 'opacity', 'font-size', 'font-family', 'font-weight', 'text-anchor'];
+		for (let i = 0; i < srcElements.length; i++) {
+			const computed = window.getComputedStyle(srcElements[i]);
+			for (const prop of styleProps) {
+				const val = computed.getPropertyValue(prop);
+				if (val) (cloneElements[i] as SVGElement).style.setProperty(prop, val);
+			}
+		}
+
+		// Set text color on token text elements (they use currentColor)
+		clone.querySelectorAll('text').forEach((t) => {
+			if (t.getAttribute('fill') === 'currentColor' || t.style.fill === 'currentColor') {
+				t.style.fill = textColor;
+			}
+		});
+
+		// Add background rect as first child (after style inlining)
+		const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		bgRect.setAttribute('width', '100%');
+		bgRect.setAttribute('height', '100%');
+		bgRect.setAttribute('fill', bgColor);
+		clone.insertBefore(bgRect, clone.firstChild);
+
+		// Set xmlns for standalone SVG
+		clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+		clone.removeAttribute('class');
+
+		return clone;
+	}
+
+	function triggerDownload(url: string, filename: string) {
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = 'dependency-tree.svg';
+		a.download = filename;
 		a.click();
 		URL.revokeObjectURL(url);
+	}
+
+	function handleExportSvg() {
+		const clone = cloneSvgForExport();
+		if (!clone) return;
+		const serializer = new XMLSerializer();
+		const svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(clone);
+		const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+		triggerDownload(URL.createObjectURL(blob), `${exportFilename}.svg`);
+		toast.success('SVG exported');
+	}
+
+	function handleExportPng() {
+		const clone = cloneSvgForExport();
+		if (!clone) return;
+
+		const w = layout.width;
+		const h = layout.height;
+		const scale = 2; // 2x resolution for crisp output
+
+		const serializer = new XMLSerializer();
+		const svgString = serializer.serializeToString(clone);
+		const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+		const url = URL.createObjectURL(svgBlob);
+
+		const img = new window.Image();
+		img.onload = () => {
+			const cvs = document.createElement('canvas');
+			cvs.width = w * scale;
+			cvs.height = h * scale;
+			const ctx = cvs.getContext('2d')!;
+			ctx.scale(scale, scale);
+			ctx.drawImage(img, 0, 0, w, h);
+			URL.revokeObjectURL(url);
+
+			cvs.toBlob((blob) => {
+				if (!blob) return;
+				triggerDownload(URL.createObjectURL(blob), `${exportFilename}.png`);
+				toast.success('PNG exported');
+			}, 'image/png');
+		};
+		img.onerror = () => {
+			URL.revokeObjectURL(url);
+			toast.error('PNG export failed');
+		};
+		img.src = url;
 	}
 
 	function handleExportLatex() {
@@ -241,9 +328,14 @@
 		<div class="absolute right-2 top-1 z-10 flex gap-1">
 			<button
 				onclick={handleExportSvg}
-				class="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+				class="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
 				title="Export as SVG"
-			>SVG</button>
+			><Download size={10} />SVG</button>
+			<button
+				onclick={handleExportPng}
+				class="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+				title="Export as PNG"
+			><Image size={10} />PNG</button>
 			<button
 				onclick={handleExportLatex}
 				class="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
