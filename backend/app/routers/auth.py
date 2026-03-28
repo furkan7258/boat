@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.rate_limit import create_rate_limit
 from app.core.security import (
@@ -31,9 +32,15 @@ async def register(
     db: AsyncSession = Depends(get_db),
     _rate_limit=Depends(register_rate_limit),
 ):
+    if settings.REGISTRATION_MODE == "closed":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Registration is currently closed")
+
     result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
         raise HTTPException(status.HTTP_409_CONFLICT, "Username already taken")
+
+    # In approval mode, new users start as inactive
+    is_active = settings.REGISTRATION_MODE == "open"
 
     user = User(
         username=body.username,
@@ -41,6 +48,7 @@ async def register(
         first_name=body.first_name,
         last_name=body.last_name,
         hashed_password=hash_password(body.password),
+        is_active=is_active,
     )
     db.add(user)
     await db.commit()
@@ -59,7 +67,10 @@ async def login(
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Account deactivated")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Your account is pending approval. Please contact an administrator.",
+        )
     return Token(access_token=create_access_token(user.id))
 
 
@@ -82,3 +93,9 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+
+@router.get("/registration-mode")
+async def registration_mode():
+    """Public endpoint — returns the current registration mode."""
+    return {"mode": settings.REGISTRATION_MODE}

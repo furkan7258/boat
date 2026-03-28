@@ -83,6 +83,11 @@
 					<a href="/rewrite" class="text-muted-foreground hover:text-foreground transition-colors">
 						Rewrite
 					</a>
+					{#if $user?.is_admin}
+						<a href="/admin" class="text-muted-foreground hover:text-foreground transition-colors">
+							Admin
+						</a>
+					{/if}
 				</div>
 			{/if}
 		</div>

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.middleware import RequestLoggingMiddleware
 from app.routers import (
+    admin,
     annotations,
     auth,
     comments,
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(comments.router, prefix="/api")
     app.include_router(guidelines.router, prefix="/api")
     app.include_router(validation.router, prefix="/api")
+    app.include_router(admin.router, prefix="/api")
 
     @app.get("/health")
     async def health():

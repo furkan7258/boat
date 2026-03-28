@@ -31,6 +31,7 @@ class User(Base, TimestampMixin):
     last_name: Mapped[str] = mapped_column(String(150))
     hashed_password: Mapped[str] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     preferences: Mapped[dict] = mapped_column(JSON, default=lambda: dict(DEFAULT_PREFERENCES))
 
     annotations: Mapped[list["Annotation"]] = relationship(back_populates="annotator")  # noqa: F821

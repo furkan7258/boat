@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
+    REGISTRATION_MODE: str = "approval"  # "open", "approval", or "closed"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

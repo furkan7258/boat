@@ -15,6 +15,7 @@ const OFFLINE_USER: UserRead = {
 	first_name: 'Local',
 	last_name: 'User',
 	is_active: true,
+	is_admin: false,
 	preferences: {
 		graph_preference: 1,
 		error_condition: false,
@@ -58,9 +59,12 @@ export async function register(data: {
 	password: string;
 	first_name: string;
 	last_name: string;
-}) {
-	await authApi.register(data);
-	await login(data.username, data.password);
+}): Promise<UserRead> {
+	const newUser = await authApi.register(data);
+	if (newUser.is_active) {
+		await login(data.username, data.password);
+	}
+	return newUser;
 }
 
 export function logout() {
