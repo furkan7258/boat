@@ -80,6 +80,9 @@
 					<a href="/search" class="text-muted-foreground hover:text-foreground transition-colors">
 						Search
 					</a>
+					<a href="/rewrite" class="text-muted-foreground hover:text-foreground transition-colors">
+						Rewrite
+					</a>
 				</div>
 			{/if}
 		</div>

@@ -1,5 +1,12 @@
 import { api } from './client';
-import type { SearchResponse, StructuralQuery, StructuralSearchResponse } from './types';
+import type {
+	RewriteApplyResponse,
+	RewritePreviewResponse,
+	RewriteRequest,
+	SearchResponse,
+	StructuralQuery,
+	StructuralSearchResponse
+} from './types';
 
 export interface SearchQuery {
 	field: string;
@@ -19,4 +26,12 @@ export function search(queries: SearchQuery[], treebankTitle?: string, offset = 
 
 export function searchStructural(query: StructuralQuery) {
 	return api.post<StructuralSearchResponse>('/search/structural', query);
+}
+
+export function rewritePreview(body: RewriteRequest) {
+	return api.post<RewritePreviewResponse>('/search/rewrite/preview', body);
+}
+
+export function rewriteApply(body: RewriteRequest) {
+	return api.post<RewriteApplyResponse>('/search/rewrite/apply', body);
 }

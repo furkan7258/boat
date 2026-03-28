@@ -167,6 +167,35 @@ export interface StructuralSearchResponse {
 	total: number;
 }
 
+// Batch Rewrite
+export interface RewriteRequest {
+	pattern: string;
+	operations: string[];
+	treebank_id?: number;
+	annotation_scope: 'template' | 'mine' | 'all';
+}
+
+export interface RewriteChange {
+	sentence_id: number;
+	sent_id: string;
+	token_id: string;
+	form: string;
+	node_name: string;
+	descriptions: string[];
+}
+
+export interface RewritePreviewResponse {
+	changes: RewriteChange[];
+	total_tokens: number;
+	total_sentences: number;
+}
+
+export interface RewriteApplyResponse {
+	applied: number;
+	skipped: number;
+	changes: RewriteChange[];
+}
+
 // Comment
 export interface CommentRead {
 	id: number;
