@@ -14,11 +14,8 @@ dependencies = [
     "bcrypt>=4.2",
     "python-multipart>=0.0.18",
     "email-validator>=2.2",
-    "ud-tools>=0.1.0",
+    "udsearch>=0.1.0",
 ]
-
-[tool.uv.sources]
-ud-tools = { path = "../../../tools/ud-tools/repo", editable = true }
 
 [project.optional-dependencies]
 dev = [
