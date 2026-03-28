@@ -76,3 +76,67 @@ class StructuralSearchResponse(BaseModel):
 
     results: list[StructuralMatch]
     total: int
+
+
+# --- Pattern-based structural search (udsearch syntax) ---
+
+
+class PatternQuery(BaseModel):
+    """Query using udsearch pattern syntax (single-node or structural)."""
+
+    pattern: str = Field(
+        ...,
+        description='Pattern string, e.g. "UPOS=NOUN & Case=Dat" or '
+        '"v: [UPOS=VERB]\\ns: [] -nsubj-> v"',
+    )
+    treebank_id: int | None = None
+    limit: int = Field(50, le=200, ge=1)
+    offset: int = Field(0, ge=0)
+
+
+# --- Batch rewrite schemas ---
+
+
+class RewriteRequest(BaseModel):
+    """Request for batch rewriting tokens that match a pattern."""
+
+    pattern: str = Field(
+        ...,
+        description='Pattern string, e.g. "UPOS=NOUN & Case=Dat" or structural pattern',
+    )
+    operations: list[str] = Field(
+        ...,
+        description='Rewrite operations, e.g. ["UPOS=ADJ", "-Case", "s.Case=Nom"]',
+    )
+    treebank_id: int | None = None
+    annotation_scope: str = Field(
+        "template",
+        description="Which annotations to rewrite: 'template', 'mine', or 'all'",
+    )
+
+
+class RewriteChange(BaseModel):
+    """A single token change from a rewrite operation."""
+
+    sentence_id: int
+    sent_id: str
+    token_id: str
+    form: str
+    node_name: str
+    descriptions: list[str]
+
+
+class RewritePreviewResponse(BaseModel):
+    """Preview of batch rewrite changes (not yet applied)."""
+
+    changes: list[RewriteChange]
+    total_tokens: int
+    total_sentences: int
+
+
+class RewriteApplyResponse(BaseModel):
+    """Result of applying batch rewrite operations."""
+
+    applied: int
+    skipped: int
+    changes: list[RewriteChange]

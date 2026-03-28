@@ -1,23 +1,27 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.annotation import Annotation
+from app.models.annotation import Annotation, AnnotationStatus
 from app.models.sentence import Sentence
 from app.models.treebank import Treebank
 from app.models.user import User
 from app.models.wordline import WordLine
 from app.schemas.search import (
+    RewriteApplyResponse,
+    RewriteChange,
+    RewritePreviewResponse,
+    RewriteRequest,
     SearchResponse,
     SearchResult,
     StructuralMatch,
     StructuralQuery,
     StructuralSearchResponse,
 )
-from app.services.structural_search import match_structural
+from app.services.structural_search import match_structural, rewrite_wordlines
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -203,3 +207,194 @@ async def structural_search(
     paginated = matches[query.offset : query.offset + query.limit]
 
     return StructuralSearchResponse(results=paginated, total=total)
+
+
+# ---------------------------------------------------------------------------
+# Batch rewrite endpoints
+# ---------------------------------------------------------------------------
+
+
+def _wl_dicts_from_annotation(annotation) -> list[dict[str, str]]:
+    """Convert ORM wordlines to dicts."""
+    return [
+        {
+            "id_f": wl.id_f,
+            "form": wl.form,
+            "lemma": wl.lemma,
+            "upos": wl.upos,
+            "xpos": wl.xpos,
+            "feats": wl.feats,
+            "head": wl.head,
+            "deprel": wl.deprel,
+            "deps": wl.deps,
+            "misc": wl.misc,
+        }
+        for wl in annotation.wordlines
+    ]
+
+
+async def _fetch_annotations_for_rewrite(
+    db: AsyncSession,
+    treebank_id: int | None,
+    scope: str,
+    current_user: User,
+) -> list[tuple[Sentence, Annotation]]:
+    """Fetch sentence+annotation pairs for rewriting."""
+    stmt = (
+        select(Sentence)
+        .join(Annotation, Annotation.sentence_id == Sentence.id)
+        .options(
+            selectinload(Sentence.treebank),
+            selectinload(Sentence.annotations).selectinload(Annotation.wordlines),
+        )
+    )
+
+    if treebank_id is not None:
+        stmt = stmt.where(Sentence.treebank_id == treebank_id)
+
+    if scope == "template":
+        stmt = stmt.where(Annotation.is_template.is_(True))
+    elif scope == "mine":
+        stmt = stmt.where(Annotation.annotator_id == current_user.id)
+
+    stmt = stmt.order_by(Sentence.treebank_id, Sentence.order)
+    result = await db.execute(stmt)
+    sentences = result.scalars().unique().all()
+
+    pairs = []
+    for sent in sentences:
+        for ann in sent.annotations:
+            if scope == "template" and not ann.is_template:
+                continue
+            if scope == "mine" and ann.annotator_id != current_user.id:
+                continue
+            if ann.wordlines:
+                pairs.append((sent, ann))
+    return pairs
+
+
+@router.post("/rewrite/preview", response_model=RewritePreviewResponse)
+async def preview_rewrite(
+    body: RewriteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Preview batch rewrite operations across matching annotations.
+
+    Returns the list of changes that would be applied without actually
+    modifying any data. Use POST /rewrite/apply to commit changes.
+    """
+    pairs = await _fetch_annotations_for_rewrite(
+        db, body.treebank_id, body.annotation_scope, current_user
+    )
+
+    all_changes: list[RewriteChange] = []
+    affected_sentences = set()
+
+    for sent, ann in pairs:
+        wl_dicts = _wl_dicts_from_annotation(ann)
+        _, changes = rewrite_wordlines(
+            wl_dicts, body.pattern, body.operations,
+            sent_id=sent.sent_id, text=sent.text or "",
+        )
+        for change in changes:
+            all_changes.append(
+                RewriteChange(
+                    sentence_id=sent.id,
+                    sent_id=sent.sent_id,
+                    token_id=change["token_id"],
+                    form=change["form"],
+                    node_name=change["node_name"],
+                    descriptions=change["descriptions"],
+                )
+            )
+            affected_sentences.add(sent.id)
+
+    return RewritePreviewResponse(
+        changes=all_changes,
+        total_tokens=len(all_changes),
+        total_sentences=len(affected_sentences),
+    )
+
+
+@router.post("/rewrite/apply", response_model=RewriteApplyResponse)
+async def apply_rewrite(
+    body: RewriteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply batch rewrite operations to matching annotations.
+
+    Modifies wordlines in-place for annotations the user owns. Template
+    annotations can only be rewritten by the user who uploaded them (or any
+    user if annotation_scope='template' — use with care).
+    """
+    pairs = await _fetch_annotations_for_rewrite(
+        db, body.treebank_id, body.annotation_scope, current_user
+    )
+
+    all_changes: list[RewriteChange] = []
+    applied = 0
+    skipped = 0
+
+    for sent, ann in pairs:
+        # Skip annotations in submitted/approved state
+        if ann.status in (AnnotationStatus.SUBMITTED, AnnotationStatus.APPROVED):
+            skipped += 1
+            continue
+
+        wl_dicts = _wl_dicts_from_annotation(ann)
+        modified_wls, changes = rewrite_wordlines(
+            wl_dicts, body.pattern, body.operations,
+            sent_id=sent.sent_id, text=sent.text or "",
+        )
+
+        if not changes:
+            continue
+
+        for change in changes:
+            all_changes.append(
+                RewriteChange(
+                    sentence_id=sent.id,
+                    sent_id=sent.sent_id,
+                    token_id=change["token_id"],
+                    form=change["form"],
+                    node_name=change["node_name"],
+                    descriptions=change["descriptions"],
+                )
+            )
+
+        # Persist: delete old wordlines, insert modified ones
+        await db.execute(
+            delete(WordLine).where(WordLine.annotation_id == ann.id)
+        )
+        for wl_dict in modified_wls:
+            wl = WordLine(
+                annotation_id=ann.id,
+                id_f=wl_dict["id_f"],
+                form=wl_dict["form"],
+                lemma=wl_dict["lemma"],
+                upos=wl_dict["upos"],
+                xpos=wl_dict["xpos"],
+                feats=wl_dict["feats"],
+                head=wl_dict["head"],
+                deprel=wl_dict["deprel"],
+                deps=wl_dict["deps"],
+                misc=wl_dict["misc"],
+            )
+            wl.populate_parsed_fields()
+            db.add(wl)
+
+        # Mark annotation as DRAFT if it was NEW
+        if ann.status == AnnotationStatus.NEW:
+            ann.status = AnnotationStatus.DRAFT
+
+        applied += 1
+
+    await db.commit()
+
+    return RewriteApplyResponse(
+        applied=applied,
+        skipped=skipped,
+        changes=all_changes,
+    )

@@ -154,7 +154,7 @@ All API routes are prefixed with `/api`:
 | sentences | `/sentences` | CRUD + /annotations |
 | annotations | `/annotations` | CRUD + GET /by-position/, GET /mine |
 | wordlines | `/wordlines` | PUT /annotations/{id}/wordlines (batch) |
-| search | `/search` | GET with multi-field query |
+| search | `/search` | GET field search, POST /structural, POST /rewrite/preview, POST /rewrite/apply |
 | comments | `/comments` | CRUD per sentence |
 | guidelines | `/guidelines` | CRUD per treebank |
 | validation | `/validation` | Validation profiles per treebank |
@@ -184,6 +184,7 @@ Health check: `GET /health` (no /api prefix).
 - **AnnotationStatus**: IntEnum — 0=NEW, 1=DRAFT, 2=SUBMITTED, 3=APPROVED, 4=REJECTED.
 - **Template annotations**: `is_template=True` annotations hold the original CoNLL-U data. User annotations are copies.
 - **Batch wordline update**: `PUT /annotations/{id}/wordlines` replaces all wordlines in one request.
+- **Structural search & rewrite**: `structural_search.py` delegates to the `udsearch` library (from `ud-tools` repo). Accepts both the legacy JSON query schema and udsearch pattern strings. Batch rewrite endpoints (`/rewrite/preview`, `/rewrite/apply`) use udsearch's pattern matching and rewrite engine. Preview-first workflow; respects annotation status (skips submitted/approved).
 
 ## Testing
 
